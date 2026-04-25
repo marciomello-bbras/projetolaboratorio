@@ -1,25 +1,10 @@
 from __future__ import annotations
 
-from datetime import date
-from typing import Protocol
 from uuid import UUID
 
-from app.models.task import TaskCreate, TaskOut, TaskPriority, TaskStatus, TaskUpdate
+from app.models.task import TaskCreate, TaskOut, TaskStatus, TaskUpdate
 from app.repositories.task_repository import TaskRepository
-
-
-class PriorityAdvisor(Protocol):
-    """Contrato para sugestao automatica de prioridade."""
-
-    def suggest_priority(
-        self,
-        *,
-        title: str,
-        description: str | None,
-        due_date: date | None,
-        status: TaskStatus,
-    ) -> TaskPriority:
-        """Retorna a prioridade sugerida para a tarefa."""
+from app.services.priority_advisor import PriorityAdvisor
 
 
 class TaskNotFoundError(Exception):
