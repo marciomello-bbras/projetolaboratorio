@@ -7,8 +7,8 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
-class TaskStatus(StrEnum):
-    """Status suportados para a tarefa."""
+class AccountsPayableStatus(StrEnum):
+    """Status suportados para a conta a pagar."""
 
     PENDING = "pending"
     IN_PROGRESS = "in_progress"
@@ -16,8 +16,8 @@ class TaskStatus(StrEnum):
     CANCELLED = "cancelled"
 
 
-class TaskPriority(StrEnum):
-    """Prioridades suportadas para a tarefa."""
+class AccountsPayablePriority(StrEnum):
+    """Prioridades suportadas para a conta a pagar."""
 
     LOW = "low"
     MEDIUM = "medium"
@@ -25,8 +25,8 @@ class TaskPriority(StrEnum):
     CRITICAL = "critical"
 
 
-class TaskBase(BaseModel):
-    """Campos compartilhados da tarefa."""
+class AccountsPayableBase(BaseModel):
+    """Campos compartilhados da conta a pagar."""
 
     model_config = ConfigDict(
         extra="forbid",
@@ -38,21 +38,21 @@ class TaskBase(BaseModel):
         ...,
         min_length=3,
         max_length=120,
-        description="Titulo curto da tarefa.",
+        description="Titulo curto da conta a pagar.",
         examples=["Validar pagamento do fornecedor XPTO"],
     )
     description: str | None = Field(
         default=None,
         max_length=1000,
-        description="Detalhes opcionais da tarefa.",
+        description="Detalhes opcionais da conta a pagar.",
     )
     due_date: date | None = Field(
         default=None,
         description="Data prevista para conclusao.",
     )
-    priority: TaskPriority = Field(
-        default=TaskPriority.MEDIUM,
-        description="Nivel de prioridade da tarefa.",
+    priority: AccountsPayablePriority = Field(
+        default=AccountsPayablePriority.MEDIUM,
+        description="Nivel de prioridade da conta a pagar.",
     )
 
     @field_validator("title")
@@ -76,12 +76,12 @@ class TaskBase(BaseModel):
         return value or None
 
 
-class TaskCreate(TaskBase):
-    """Payload de criacao da tarefa."""
+class AccountsPayableCreate(AccountsPayableBase):
+    """Payload de criacao da conta a pagar."""
 
 
-class TaskUpdate(BaseModel):
-    """Payload de atualizacao da tarefa."""
+class AccountsPayableUpdate(BaseModel):
+    """Payload de atualizacao da conta a pagar."""
 
     model_config = ConfigDict(
         extra="forbid",
@@ -93,24 +93,24 @@ class TaskUpdate(BaseModel):
         default=None,
         min_length=3,
         max_length=120,
-        description="Titulo curto da tarefa.",
+        description="Titulo curto da conta a pagar.",
     )
     description: str | None = Field(
         default=None,
         max_length=1000,
-        description="Detalhes opcionais da tarefa.",
+        description="Detalhes opcionais da conta a pagar.",
     )
     due_date: date | None = Field(
         default=None,
         description="Data prevista para conclusao.",
     )
-    priority: TaskPriority | None = Field(
+    priority: AccountsPayablePriority | None = Field(
         default=None,
-        description="Nivel de prioridade da tarefa.",
+        description="Nivel de prioridade da conta a pagar.",
     )
-    status: TaskStatus | None = Field(
+    status: AccountsPayableStatus | None = Field(
         default=None,
-        description="Status do ciclo de vida da tarefa.",
+        description="Status do ciclo de vida da conta a pagar.",
     )
 
     @field_validator("title")
@@ -136,7 +136,7 @@ class TaskUpdate(BaseModel):
         return value or None
 
     @model_validator(mode="after")
-    def validate_has_updates(self) -> "TaskUpdate":
+    def validate_has_updates(self) -> "AccountsPayableUpdate":
         """Exige ao menos um campo para atualizacao."""
 
         if self.model_dump(exclude_none=True) == {}:
@@ -144,12 +144,12 @@ class TaskUpdate(BaseModel):
         return self
 
 
-class TaskOut(TaskBase):
-    """Schema de resposta da tarefa."""
+class AccountsPayableOut(AccountsPayableBase):
+    """Schema de resposta da conta a pagar."""
 
     model_config = ConfigDict(from_attributes=True)
 
-    id: UUID = Field(..., description="Identificador unico da tarefa.")
-    status: TaskStatus = Field(..., description="Status do ciclo de vida da tarefa.")
+    id: UUID = Field(..., description="Identificador unico da conta a pagar.")
+    status: AccountsPayableStatus = Field(..., description="Status do ciclo de vida da conta a pagar.")
     created_at: datetime = Field(..., description="Data e hora de criacao.")
     updated_at: datetime = Field(..., description="Data e hora da ultima atualizacao.")

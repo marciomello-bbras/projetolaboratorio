@@ -7,7 +7,7 @@ from datetime import UTC, date, datetime
 from typing import Final
 from urllib import error, request
 
-from app.models.task import TaskPriority, TaskStatus
+from app.models.accounts_payable import AccountsPayablePriority, AccountsPayableStatus
 
 _OPENAI_URL: Final[str] = "https://api.openai.com/v1/responses"
 _DEFAULT_MODEL: Final[str] = "gpt-4o-mini"
@@ -36,8 +36,8 @@ class PriorityAdvisor:
         title: str,
         description: str | None,
         due_date: date | None,
-        status: TaskStatus,
-    ) -> TaskPriority:
+        status: AccountsPayableStatus,
+    ) -> AccountsPayablePriority:
         """Retorna prioridade sugerida com fallback obrigatorio."""
 
         local_priority = self._suggest_local_priority(
@@ -65,15 +65,15 @@ class PriorityAdvisor:
         title: str,
         description: str | None,
         due_date: date | None,
-        status: TaskStatus,
-    ) -> TaskPriority:
+        status: AccountsPayableStatus,
+    ) -> AccountsPayablePriority:
         """Aplica heuristica local sem custo externo."""
 
-        if status == TaskStatus.CANCELLED:
-            return TaskPriority.LOW
+        if status == AccountsPayableStatus.CANCELLED:
+            return AccountsPayablePriority.LOW
 
-        if status == TaskStatus.COMPLETED:
-            return TaskPriority.LOW
+        if status == AccountsPayableStatus.COMPLETED:
+            return AccountsPayablePriority.LOW
 
         text = f"{title} {description or ''}".lower()
         today = datetime.now(UTC).date()
@@ -81,11 +81,11 @@ class PriorityAdvisor:
         if due_date is not None:
             days_until_due = (due_date - today).days
             if days_until_due < 0:
-                return TaskPriority.CRITICAL
+                return AccountsPayablePriority.CRITICAL
             if days_until_due <= 1:
-                return TaskPriority.HIGH
+                return AccountsPayablePriority.HIGH
             if days_until_due <= 3:
-                return TaskPriority.MEDIUM
+                return AccountsPayablePriority.MEDIUM
         else:
             days_until_due = None
 
@@ -111,15 +111,15 @@ class PriorityAdvisor:
         )
 
         if any(term in text for term in urgent_terms):
-            return TaskPriority.HIGH
+            return AccountsPayablePriority.HIGH
 
         if any(term in text for term in important_terms):
-            return TaskPriority.MEDIUM
+            return AccountsPayablePriority.MEDIUM
 
         if days_until_due is not None and days_until_due <= 7:
-            return TaskPriority.MEDIUM
+            return AccountsPayablePriority.MEDIUM
 
-        return TaskPriority.LOW
+        return AccountsPayablePriority.LOW
 
     def _suggest_llm_priority(
         self,
@@ -127,9 +127,9 @@ class PriorityAdvisor:
         title: str,
         description: str | None,
         due_date: date | None,
-        status: TaskStatus,
-        fallback: TaskPriority,
-    ) -> TaskPriority | None:
+        status: AccountsPayableStatus,
+        fallback: AccountsPayablePriority,
+    ) -> AccountsPayablePriority | None:
         """Consulta LLM com timeout curto e retorno restrito."""
 
         try:
@@ -160,7 +160,7 @@ class PriorityAdvisor:
             if raw_output is None:
                 return None
             normalized_output = raw_output.strip().strip('"').strip().lower()
-            return TaskPriority(normalized_output)
+            return AccountsPayablePriority(normalized_output)
         except (json.JSONDecodeError, KeyError, TypeError, ValueError):
             return None
 
@@ -170,13 +170,13 @@ class PriorityAdvisor:
         title: str,
         description: str | None,
         due_date: date | None,
-        status: TaskStatus,
-        fallback: TaskPriority,
+        status: AccountsPayableStatus,
+        fallback: AccountsPayablePriority,
     ) -> dict[str, object]:
         """Monta payload restrito para a chamada remota."""
 
         instructions = (
-            "Voce recebe dados de uma tarefa financeira interna. "
+            "Voce recebe dados de uma conta a pagar interna. "
             "Responda com apenas uma palavra em minusculas: "
             "low, medium, high ou critical. "
             "Considere urgencia, vencimento e impacto operacional. "
