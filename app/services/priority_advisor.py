@@ -72,8 +72,11 @@ class PriorityAdvisor:
         if status == AccountsPayableStatus.CANCELLED:
             return AccountsPayablePriority.LOW
 
-        if status == AccountsPayableStatus.COMPLETED:
+        if status == AccountsPayableStatus.PAID:
             return AccountsPayablePriority.LOW
+
+        if status == AccountsPayableStatus.OVERDUE:
+            return AccountsPayablePriority.CRITICAL
 
         text = f"{title} {description or ''}".lower()
         today = datetime.now(UTC).date()

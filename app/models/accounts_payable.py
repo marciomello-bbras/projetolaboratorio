@@ -11,8 +11,8 @@ class AccountsPayableStatus(StrEnum):
     """Status suportados para a conta a pagar."""
 
     PENDING = "pending"
-    IN_PROGRESS = "in_progress"
-    COMPLETED = "completed"
+    PAID = "paid"
+    OVERDUE = "overdue"
     CANCELLED = "cancelled"
 
 
@@ -108,10 +108,6 @@ class AccountsPayableUpdate(BaseModel):
         default=None,
         description="Nivel de prioridade da conta a pagar.",
     )
-    status: AccountsPayableStatus | None = Field(
-        default=None,
-        description="Status do ciclo de vida da conta a pagar.",
-    )
 
     @field_validator("title")
     @classmethod
@@ -144,6 +140,66 @@ class AccountsPayableUpdate(BaseModel):
         return self
 
 
+class AccountsPayableStatusUpdate(BaseModel):
+    """Payload de transicao de status da conta a pagar."""
+
+    model_config = ConfigDict(
+        extra="forbid",
+        str_strip_whitespace=True,
+        validate_assignment=True,
+    )
+
+    status: AccountsPayableStatus = Field(
+        ...,
+        description="Novo status da conta a pagar.",
+    )
+
+    @field_validator("status")
+    @classmethod
+    def validate_status(cls, value: AccountsPayableStatus) -> AccountsPayableStatus:
+        """Restringe status que exigem fluxo dedicado."""
+
+        if value == AccountsPayableStatus.PAID:
+            raise ValueError("use a rota de pagamento para marcar a conta como paga")
+        return value
+
+
+class AccountsPayablePaymentCreate(BaseModel):
+    """Payload de registro de pagamento."""
+
+    model_config = ConfigDict(
+        extra="forbid",
+        str_strip_whitespace=True,
+        validate_assignment=True,
+    )
+
+    payment_date: date = Field(
+        ...,
+        description="Data em que o pagamento foi realizado.",
+    )
+    paid_amount: float = Field(
+        ...,
+        gt=0,
+        description="Valor efetivamente pago.",
+    )
+    payment_note: str | None = Field(
+        default=None,
+        max_length=500,
+        description="Observacao opcional do pagamento.",
+    )
+
+    @field_validator("payment_note")
+    @classmethod
+    def normalize_payment_note(cls, value: str | None) -> str | None:
+        """Normaliza a observacao opcional do pagamento."""
+
+        if value is None:
+            return None
+
+        value = value.strip()
+        return value or None
+
+
 class AccountsPayableOut(AccountsPayableBase):
     """Schema de resposta da conta a pagar."""
 
@@ -151,5 +207,8 @@ class AccountsPayableOut(AccountsPayableBase):
 
     id: UUID = Field(..., description="Identificador unico da conta a pagar.")
     status: AccountsPayableStatus = Field(..., description="Status do ciclo de vida da conta a pagar.")
+    payment_date: date | None = Field(None, description="Data em que o pagamento foi realizado.")
+    paid_amount: float | None = Field(None, description="Valor efetivamente pago.")
+    payment_note: str | None = Field(None, description="Observacao opcional do pagamento.")
     created_at: datetime = Field(..., description="Data e hora de criacao.")
     updated_at: datetime = Field(..., description="Data e hora da ultima atualizacao.")
