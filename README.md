@@ -24,6 +24,7 @@ No backlog atual, o foco está em:
 - Pydantic
 - Uvicorn
 - Pytest para testes automatizados
+- Makefile com comandos de apoio
 
 ## Estrutura do projeto
 
@@ -54,6 +55,12 @@ docs/
 
 As dependências do projeto estão centralizadas em `requirements.txt`.
 
+Pré-requisitos:
+
+- Python 3.12 ou superior
+- `pip` disponível no Python 3
+- `make` opcional, caso queira usar os atalhos do `Makefile`
+
 ### 1. Criar e ativar ambiente virtual
 
 No Windows PowerShell:
@@ -63,10 +70,23 @@ py -3 -m venv .venv
 .venv\Scripts\Activate.ps1
 ```
 
+No Linux/macOS:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+```
+
 ### 2. Instalar dependências
 
 ```bash
 py -3 -m pip install -r requirements.txt
+```
+
+Ou com `Makefile`:
+
+```bash
+make install
 ```
 
 Se quiser habilitar o componente de prioridade com chamada externa, configure também a credencial da API usada pelo `PriorityAdvisor`.
@@ -74,6 +94,18 @@ Se quiser habilitar o componente de prioridade com chamada externa, configure ta
 ## Configuração
 
 O projeto espera variáveis de ambiente definidas em `.env.example`:
+
+Crie um arquivo local a partir do exemplo:
+
+```bash
+copy .env.example .env
+```
+
+No Linux/macOS:
+
+```bash
+cp .env.example .env
+```
 
 ```env
 APP_NAME=Micro-API de Contas a Pagar
@@ -90,12 +122,26 @@ OPENAI_API_KEY=
 OPENAI_MODEL=gpt-4o-mini
 ```
 
+Resumo das variáveis:
+
+- `APP_NAME`, `APP_VERSION`, `API_PREFIX`, `APP_HOST` e `APP_PORT`: configuração da API
+- `OPENAI_API_KEY`: habilita a tentativa de chamada remota do componente de IA
+- `OPENAI_MODEL`: define o modelo usado nessa chamada opcional
+
+Se `OPENAI_API_KEY` não for informada, o projeto continua funcionando normalmente e o `PriorityAdvisor` usa apenas a heurística local.
+
 ## Execução
 
 Suba a API com:
 
 ```bash
 py -3 -m uvicorn app.main:app --reload
+```
+
+Ou com `Makefile`:
+
+```bash
+make run
 ```
 
 Documentação interativa:
@@ -106,6 +152,12 @@ Documentação interativa:
 Health check:
 
 - `GET /`
+
+Verificação rápida após subir a API:
+
+```bash
+curl http://127.0.0.1:8000/
+```
 
 ## Endpoints principais
 
@@ -121,18 +173,55 @@ Base atual: `/accounts-payable`
 - `GET /accounts-payable/overdue`: lista contas vencidas
 - `DELETE /accounts-payable/{id}`: bloqueado por regra de rastreabilidade
 
+Exemplo de criação:
+
+```json
+{
+  "descricao": "Pagamento de licenca SaaS",
+  "fornecedor_ou_favorecido": "Fornecedor Cloud",
+  "categoria": "Software",
+  "valor_previsto": "299.90",
+  "data_vencimento": "2026-05-05",
+  "data_emissao": "2026-04-27",
+  "centro_de_custo": "TI",
+  "observacoes": "Assinatura anual parcelada"
+}
+```
+
+Exemplo de resposta:
+
+```json
+{
+  "sucesso": true,
+  "mensagem": "Conta a pagar criada com sucesso.",
+  "dados": {
+    "id": "uuid",
+    "descricao": "Pagamento de licenca SaaS",
+    "status": "pending"
+  }
+}
+```
+
 ## Modelo de domínio
 
 Campos principais da conta a pagar:
+
+Obrigatórios:
 
 - `descricao`
 - `fornecedor_ou_favorecido`
 - `categoria`
 - `valor_previsto`
 - `data_vencimento`
+
+Opcionais:
+
 - `centro_de_custo`
 - `data_emissao`
 - `observacoes`
+
+Calculados e de controle:
+
 - `status`
 
 Campos de liquidação:
@@ -156,6 +245,15 @@ O projeto segue uma separação simples por camadas:
 - `models`: schemas e validações com Pydantic
 - `services`: regras de negócio
 - `repositories`: armazenamento em memória para o fluxo atual do MVP
+
+Arquivos principais:
+
+- `app/main.py`: bootstrap da aplicação e handlers globais de erro
+- `app/api/accounts_payable_routes.py`: endpoints HTTP do domínio
+- `app/models/accounts_payable.py`: modelos e validações de entrada/saída
+- `app/services/accounts_payable_service.py`: regras de negócio e orquestração
+- `app/repositories/accounts_payable_repository.py`: armazenamento em memória
+- `app/services/priority_advisor.py`: heurística local e chamada opcional de IA
 
 Fluxo resumido:
 
@@ -185,13 +283,35 @@ O componente `PriorityAdvisor` foi implementado para sugerir prioridade com duas
 1. heurística local, sem custo externo;
 2. chamada remota opcional para API de IA, com fallback automático para a heurística local em caso de falha.
 
+Fluxo atual:
+
+1. recebe `descricao`, `observacoes`, `data_vencimento` e `status`;
+2. calcula uma prioridade local com base em prazo e palavras-chave;
+3. se `OPENAI_API_KEY` estiver configurada, tenta uma chamada remota;
+4. se a chamada falhar, mantém o resultado da heurística local.
+
 Hoje ele:
 
 - classifica prioridades como `low`, `medium`, `high` e `critical`;
 - considera vencimento, palavras-chave e status;
 - retorna fallback seguro quando a chamada externa falha.
 
-Importante: no estado atual do projeto, o `PriorityAdvisor` existe como componente testado e preparado, mas não está integrado ao fluxo principal de criação/atualização da conta a pagar.
+Variáveis relacionadas:
+
+- `OPENAI_API_KEY`
+- `OPENAI_MODEL`
+
+Exemplo de cenário:
+
+- conta com vencimento próximo: tende a `high`
+- conta vencida: tende a `critical`
+- conta sem urgência explícita: tende a `low`
+
+Importante:
+
+- hoje o `PriorityAdvisor` existe como componente testado e preparado;
+- ele ainda não participa do fluxo principal de criação ou atualização da conta a pagar;
+- portanto, a IA está presente no projeto, mas ainda não é uma funcionalidade exposta na API atual.
 
 ## Regras de negócio já implementadas
 
@@ -220,6 +340,12 @@ Executar todos os testes:
 py -3 -m pytest tests
 ```
 
+Ou com `Makefile`:
+
+```bash
+make test
+```
+
 Executar um arquivo específico:
 
 ```bash
@@ -229,6 +355,13 @@ py -3 -m pytest tests/test_accounts_payable_routes.py
 ```
 
 Observação: há um teste marcado como `xfail` no fluxo de remoção, porque a API atualmente bloqueia `DELETE` para preservar rastreabilidade.
+
+Resultado esperado da suíte no estado atual:
+
+- testes de serviço: passando
+- testes do `PriorityAdvisor`: passando
+- testes de rota: passando
+- 1 caso `xfail` documentado para remoção física bloqueada
 
 ## Limitações atuais
 
@@ -255,4 +388,19 @@ Estado atual do MVP ainda possui limitações importantes:
 
 ## Status do projeto
 
-O projeto já cobre boa parte do fluxo core da micro-API, mas ainda não representa o MVP final completo descrito no backlog. O README reflete o estado atual do código versionado, não a visão futura completa do escopo.
+Já implementado:
+
+- fluxo básico de cadastro, consulta, atualização, cancelamento e pagamento
+- validações principais do domínio
+- documentação OpenAPI via FastAPI
+- suíte de testes para serviço, rotas e componente de IA
+- utilitários de projeto como `Makefile`, `requirements.txt` e coleção Postman
+
+Ainda pendente em relação ao backlog:
+
+- autenticação interna simples
+- filtros, paginação e ordenação
+- integração efetiva da prioridade assistida por IA ao fluxo principal
+- refinamento final da documentação para entrega
+
+O README reflete o estado atual do código versionado, não uma visão futura já implementada.
