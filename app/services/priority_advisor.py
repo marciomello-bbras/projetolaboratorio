@@ -33,17 +33,17 @@ class PriorityAdvisor:
     def suggest_priority(
         self,
         *,
-        title: str,
-        description: str | None,
-        due_date: date | None,
+        descricao: str,
+        observacoes: str | None,
+        data_vencimento: date | None,
         status: AccountsPayableStatus,
     ) -> AccountsPayablePriority:
         """Retorna prioridade sugerida com fallback obrigatorio."""
 
         local_priority = self._suggest_local_priority(
-            title=title,
-            description=description,
-            due_date=due_date,
+            descricao=descricao,
+            observacoes=observacoes,
+            data_vencimento=data_vencimento,
             status=status,
         )
 
@@ -51,9 +51,9 @@ class PriorityAdvisor:
             return local_priority
 
         remote_priority = self._suggest_llm_priority(
-            title=title,
-            description=description,
-            due_date=due_date,
+            descricao=descricao,
+            observacoes=observacoes,
+            data_vencimento=data_vencimento,
             status=status,
             fallback=local_priority,
         )
@@ -62,9 +62,9 @@ class PriorityAdvisor:
     def _suggest_local_priority(
         self,
         *,
-        title: str,
-        description: str | None,
-        due_date: date | None,
+        descricao: str,
+        observacoes: str | None,
+        data_vencimento: date | None,
         status: AccountsPayableStatus,
     ) -> AccountsPayablePriority:
         """Aplica heuristica local sem custo externo."""
@@ -78,11 +78,11 @@ class PriorityAdvisor:
         if status == AccountsPayableStatus.OVERDUE:
             return AccountsPayablePriority.CRITICAL
 
-        text = f"{title} {description or ''}".lower()
+        text = f"{descricao} {observacoes or ''}".lower()
         today = datetime.now(UTC).date()
 
-        if due_date is not None:
-            days_until_due = (due_date - today).days
+        if data_vencimento is not None:
+            days_until_due = (data_vencimento - today).days
             if days_until_due < 0:
                 return AccountsPayablePriority.CRITICAL
             if days_until_due <= 1:
@@ -127,9 +127,9 @@ class PriorityAdvisor:
     def _suggest_llm_priority(
         self,
         *,
-        title: str,
-        description: str | None,
-        due_date: date | None,
+        descricao: str,
+        observacoes: str | None,
+        data_vencimento: date | None,
         status: AccountsPayableStatus,
         fallback: AccountsPayablePriority,
     ) -> AccountsPayablePriority | None:
@@ -137,9 +137,9 @@ class PriorityAdvisor:
 
         try:
             payload = self._build_payload(
-                title=title,
-                description=description,
-                due_date=due_date,
+                descricao=descricao,
+                observacoes=observacoes,
+                data_vencimento=data_vencimento,
                 status=status,
                 fallback=fallback,
             )
@@ -170,9 +170,9 @@ class PriorityAdvisor:
     def _build_payload(
         self,
         *,
-        title: str,
-        description: str | None,
-        due_date: date | None,
+        descricao: str,
+        observacoes: str | None,
+        data_vencimento: date | None,
         status: AccountsPayableStatus,
         fallback: AccountsPayablePriority,
     ) -> dict[str, object]:
@@ -186,9 +186,9 @@ class PriorityAdvisor:
             f"Se houver ambiguidade, responda {fallback.value}."
         )
         task_context = {
-            "title": title,
-            "description": description,
-            "due_date": due_date.isoformat() if due_date else None,
+            "descricao": descricao,
+            "observacoes": observacoes,
+            "data_vencimento": data_vencimento.isoformat() if data_vencimento else None,
             "status": status.value,
         }
 

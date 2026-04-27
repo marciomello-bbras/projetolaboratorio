@@ -34,40 +34,62 @@ class AccountsPayableBase(BaseModel):
         validate_assignment=True,
     )
 
-    title: str = Field(
+    descricao: str = Field(
         ...,
         min_length=3,
-        max_length=120,
-        description="Titulo curto da conta a pagar.",
-        examples=["Validar pagamento do fornecedor XPTO"],
+        max_length=255,
+        description="Descricao da conta a pagar.",
+        examples=["Pagamento de servicos contabeis de abril"],
     )
-    description: str | None = Field(
+    fornecedor_ou_favorecido: str = Field(
+        ...,
+        min_length=2,
+        max_length=150,
+        description="Nome do fornecedor ou favorecido.",
+    )
+    categoria: str = Field(
+        ...,
+        min_length=2,
+        max_length=100,
+        description="Categoria da conta a pagar.",
+    )
+    valor_previsto: float = Field(
+        ...,
+        gt=0,
+        description="Valor previsto da conta a pagar.",
+    )
+    data_vencimento: date = Field(
+        ...,
+        description="Data de vencimento da conta a pagar.",
+    )
+    centro_de_custo: str | None = Field(
+        default=None,
+        max_length=100,
+        description="Centro de custo associado, quando informado.",
+    )
+    data_emissao: date | None = Field(
+        default=None,
+        description="Data de emissao da conta, quando informada.",
+    )
+    observacoes: str | None = Field(
         default=None,
         max_length=1000,
-        description="Detalhes opcionais da conta a pagar.",
-    )
-    due_date: date | None = Field(
-        default=None,
-        description="Data prevista para conclusao.",
-    )
-    priority: AccountsPayablePriority = Field(
-        default=AccountsPayablePriority.MEDIUM,
-        description="Nivel de prioridade da conta a pagar.",
+        description="Observacoes adicionais da conta a pagar.",
     )
 
-    @field_validator("title")
+    @field_validator("descricao", "fornecedor_ou_favorecido", "categoria")
     @classmethod
-    def validate_title(cls, value: str) -> str:
-        """Rejeita titulos em branco."""
+    def validate_required_text(cls, value: str) -> str:
+        """Rejeita textos obrigatorios em branco."""
 
         if not value.strip():
-            raise ValueError("o titulo nao pode estar em branco")
+            raise ValueError("o campo nao pode estar em branco")
         return value
 
-    @field_validator("description")
+    @field_validator("centro_de_custo", "observacoes")
     @classmethod
-    def normalize_description(cls, value: str | None) -> str | None:
-        """Normaliza a descricao opcional."""
+    def normalize_optional_text(cls, value: str | None) -> str | None:
+        """Normaliza textos opcionais."""
 
         if value is None:
             return None
@@ -89,41 +111,63 @@ class AccountsPayableUpdate(BaseModel):
         validate_assignment=True,
     )
 
-    title: str | None = Field(
+    descricao: str | None = Field(
         default=None,
         min_length=3,
-        max_length=120,
-        description="Titulo curto da conta a pagar.",
+        max_length=255,
+        description="Descricao da conta a pagar.",
     )
-    description: str | None = Field(
+    fornecedor_ou_favorecido: str | None = Field(
+        default=None,
+        min_length=2,
+        max_length=150,
+        description="Nome do fornecedor ou favorecido.",
+    )
+    categoria: str | None = Field(
+        default=None,
+        min_length=2,
+        max_length=100,
+        description="Categoria da conta a pagar.",
+    )
+    valor_previsto: float | None = Field(
+        default=None,
+        gt=0,
+        description="Valor previsto da conta a pagar.",
+    )
+    data_vencimento: date | None = Field(
+        default=None,
+        description="Data de vencimento da conta a pagar.",
+    )
+    centro_de_custo: str | None = Field(
+        default=None,
+        max_length=100,
+        description="Centro de custo associado, quando informado.",
+    )
+    data_emissao: date | None = Field(
+        default=None,
+        description="Data de emissao da conta, quando informada.",
+    )
+    observacoes: str | None = Field(
         default=None,
         max_length=1000,
-        description="Detalhes opcionais da conta a pagar.",
-    )
-    due_date: date | None = Field(
-        default=None,
-        description="Data prevista para conclusao.",
-    )
-    priority: AccountsPayablePriority | None = Field(
-        default=None,
-        description="Nivel de prioridade da conta a pagar.",
+        description="Observacoes adicionais da conta a pagar.",
     )
 
-    @field_validator("title")
+    @field_validator("descricao", "fornecedor_ou_favorecido", "categoria")
     @classmethod
-    def validate_title(cls, value: str | None) -> str | None:
-        """Rejeita titulos em branco quando informados."""
+    def validate_required_text(cls, value: str | None) -> str | None:
+        """Rejeita textos obrigatorios em branco quando informados."""
 
         if value is None:
             return None
         if not value.strip():
-            raise ValueError("o titulo nao pode estar em branco")
+            raise ValueError("o campo nao pode estar em branco")
         return value
 
-    @field_validator("description")
+    @field_validator("centro_de_custo", "observacoes")
     @classmethod
-    def normalize_description(cls, value: str | None) -> str | None:
-        """Normaliza a descricao opcional."""
+    def normalize_optional_text(cls, value: str | None) -> str | None:
+        """Normaliza textos opcionais."""
 
         if value is None:
             return None
@@ -173,22 +217,22 @@ class AccountsPayablePaymentCreate(BaseModel):
         validate_assignment=True,
     )
 
-    payment_date: date = Field(
+    data_pagamento: date = Field(
         ...,
         description="Data em que o pagamento foi realizado.",
     )
-    paid_amount: float = Field(
+    valor_pago: float = Field(
         ...,
         gt=0,
         description="Valor efetivamente pago.",
     )
-    payment_note: str | None = Field(
+    observacao_pagamento: str | None = Field(
         default=None,
         max_length=500,
         description="Observacao opcional do pagamento.",
     )
 
-    @field_validator("payment_note")
+    @field_validator("observacao_pagamento")
     @classmethod
     def normalize_payment_note(cls, value: str | None) -> str | None:
         """Normaliza a observacao opcional do pagamento."""
@@ -207,8 +251,8 @@ class AccountsPayableOut(AccountsPayableBase):
 
     id: UUID = Field(..., description="Identificador unico da conta a pagar.")
     status: AccountsPayableStatus = Field(..., description="Status do ciclo de vida da conta a pagar.")
-    payment_date: date | None = Field(None, description="Data em que o pagamento foi realizado.")
-    paid_amount: float | None = Field(None, description="Valor efetivamente pago.")
-    payment_note: str | None = Field(None, description="Observacao opcional do pagamento.")
-    created_at: datetime = Field(..., description="Data e hora de criacao.")
-    updated_at: datetime = Field(..., description="Data e hora da ultima atualizacao.")
+    data_pagamento: date | None = Field(None, description="Data em que o pagamento foi realizado.")
+    valor_pago: float | None = Field(None, description="Valor efetivamente pago.")
+    observacao_pagamento: str | None = Field(None, description="Observacao opcional do pagamento.")
+    criado_em: datetime = Field(..., description="Data e hora de criacao.")
+    atualizado_em: datetime = Field(..., description="Data e hora da ultima atualizacao.")

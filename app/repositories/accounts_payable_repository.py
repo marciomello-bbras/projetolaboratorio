@@ -24,16 +24,20 @@ class AccountsPayableRepository:
         now = datetime.now(UTC)
         accounts_payable = AccountsPayableOut(
             id=uuid4(),
-            title=payload.title,
-            description=payload.description,
-            due_date=payload.due_date,
-            priority=payload.priority,
+            descricao=payload.descricao,
+            fornecedor_ou_favorecido=payload.fornecedor_ou_favorecido,
+            categoria=payload.categoria,
+            valor_previsto=payload.valor_previsto,
+            data_vencimento=payload.data_vencimento,
+            centro_de_custo=payload.centro_de_custo,
+            data_emissao=payload.data_emissao,
+            observacoes=payload.observacoes,
             status=AccountsPayableStatus.PENDING,
-            payment_date=None,
-            paid_amount=None,
-            payment_note=None,
-            created_at=now,
-            updated_at=now,
+            data_pagamento=None,
+            valor_pago=None,
+            observacao_pagamento=None,
+            criado_em=now,
+            atualizado_em=now,
         )
         self._accounts_payable[accounts_payable.id] = accounts_payable
         return accounts_payable.model_copy(deep=True)
@@ -66,17 +70,12 @@ class AccountsPayableRepository:
         updated_accounts_payable = current.model_copy(
             update={
                 **changes,
-                "updated_at": datetime.now(UTC),
+                "atualizado_em": datetime.now(UTC),
             },
             deep=True,
         )
         self._accounts_payable[accounts_payable_id] = updated_accounts_payable
         return updated_accounts_payable.model_copy(deep=True)
-
-    def delete(self, accounts_payable_id: UUID) -> bool:
-        """Remove uma conta a pagar pelo identificador."""
-
-        return self._accounts_payable.pop(accounts_payable_id, None) is not None
 
     def register_payment(
         self,
@@ -92,10 +91,10 @@ class AccountsPayableRepository:
         paid_accounts_payable = current.model_copy(
             update={
                 "status": AccountsPayableStatus.PAID,
-                "payment_date": payload.payment_date,
-                "paid_amount": payload.paid_amount,
-                "payment_note": payload.payment_note,
-                "updated_at": datetime.now(UTC),
+                "data_pagamento": payload.data_pagamento,
+                "valor_pago": payload.valor_pago,
+                "observacao_pagamento": payload.observacao_pagamento,
+                "atualizado_em": datetime.now(UTC),
             },
             deep=True,
         )
@@ -116,7 +115,7 @@ class AccountsPayableRepository:
         transitioned_accounts_payable = current.model_copy(
             update={
                 "status": status,
-                "updated_at": datetime.now(UTC),
+                "atualizado_em": datetime.now(UTC),
             },
             deep=True,
         )
