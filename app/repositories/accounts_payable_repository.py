@@ -22,7 +22,65 @@ class AccountsPayableRepository:
         """Cria uma conta a pagar e armazena em memoria."""
 
         now = datetime.now(UTC)
-        accounts_payable = AccountsPayableOut(
+        accounts_payable = self._build_new_accounts_payable(payload, now)
+        return self._save(accounts_payable)
+
+    def list(self) -> list[AccountsPayableOut]:
+        """Lista todas as contas a pagar cadastradas."""
+
+        return [accounts_payable.model_copy(deep=True) for accounts_payable in self._accounts_payable.values()]
+
+    def get_by_id(self, accounts_payable_id: UUID) -> AccountsPayableOut | None:
+        """Busca uma conta a pagar pelo identificador."""
+
+        return self._copy(self._accounts_payable.get(accounts_payable_id))
+
+    def update(
+        self,
+        accounts_payable_id: UUID,
+        payload: AccountsPayableUpdate,
+    ) -> AccountsPayableOut | None:
+        """Atualiza campos permitidos de uma conta a pagar existente."""
+
+        return self._update_stored(
+            accounts_payable_id,
+            payload.model_dump(exclude_none=True),
+        )
+
+    def register_payment(
+        self,
+        accounts_payable_id: UUID,
+        payload: AccountsPayablePaymentCreate,
+    ) -> AccountsPayableOut | None:
+        """Registra o pagamento de uma conta a pagar."""
+
+        return self._update_stored(
+            accounts_payable_id,
+            {
+                "status": AccountsPayableStatus.PAID,
+                "data_pagamento": payload.data_pagamento,
+                "valor_pago": payload.valor_pago,
+                "observacao_pagamento": payload.observacao_pagamento,
+            },
+        )
+
+    def transition_status(
+        self,
+        accounts_payable_id: UUID,
+        status: AccountsPayableStatus,
+    ) -> AccountsPayableOut | None:
+        """Atualiza o status de uma conta a pagar."""
+
+        return self._update_stored(accounts_payable_id, {"status": status})
+
+    def _build_new_accounts_payable(
+        self,
+        payload: AccountsPayableCreate,
+        now: datetime,
+    ) -> AccountsPayableOut:
+        """Monta a entidade persistida para um novo cadastro."""
+
+        return AccountsPayableOut(
             id=uuid4(),
             descricao=payload.descricao,
             fornecedor_ou_favorecido=payload.fornecedor_ou_favorecido,
@@ -39,34 +97,18 @@ class AccountsPayableRepository:
             criado_em=now,
             atualizado_em=now,
         )
-        self._accounts_payable[accounts_payable.id] = accounts_payable
-        return accounts_payable.model_copy(deep=True)
 
-    def list(self) -> list[AccountsPayableOut]:
-        """Lista todas as contas a pagar cadastradas."""
-
-        return [accounts_payable.model_copy(deep=True) for accounts_payable in self._accounts_payable.values()]
-
-    def get_by_id(self, accounts_payable_id: UUID) -> AccountsPayableOut | None:
-        """Busca uma conta a pagar pelo identificador."""
-
-        accounts_payable = self._accounts_payable.get(accounts_payable_id)
-        if accounts_payable is None:
-            return None
-        return accounts_payable.model_copy(deep=True)
-
-    def update(
+    def _update_stored(
         self,
         accounts_payable_id: UUID,
-        payload: AccountsPayableUpdate,
+        changes: dict[str, object],
     ) -> AccountsPayableOut | None:
-        """Atualiza campos permitidos de uma conta a pagar existente."""
+        """Aplica mudancas no registro persistido e devolve copia isolada."""
 
         current = self._accounts_payable.get(accounts_payable_id)
         if current is None:
             return None
 
-        changes = payload.model_dump(exclude_none=True)
         updated_accounts_payable = current.model_copy(
             update={
                 **changes,
@@ -74,50 +116,17 @@ class AccountsPayableRepository:
             },
             deep=True,
         )
-        self._accounts_payable[accounts_payable_id] = updated_accounts_payable
-        return updated_accounts_payable.model_copy(deep=True)
+        return self._save(updated_accounts_payable)
 
-    def register_payment(
-        self,
-        accounts_payable_id: UUID,
-        payload: AccountsPayablePaymentCreate,
-    ) -> AccountsPayableOut | None:
-        """Registra o pagamento de uma conta a pagar."""
+    def _save(self, accounts_payable: AccountsPayableOut) -> AccountsPayableOut:
+        """Persiste a entidade em memoria e devolve copia defensiva."""
 
-        current = self._accounts_payable.get(accounts_payable_id)
-        if current is None:
+        self._accounts_payable[accounts_payable.id] = accounts_payable
+        return accounts_payable.model_copy(deep=True)
+
+    def _copy(self, accounts_payable: AccountsPayableOut | None) -> AccountsPayableOut | None:
+        """Devolve copia defensiva do registro quando existente."""
+
+        if accounts_payable is None:
             return None
-
-        paid_accounts_payable = current.model_copy(
-            update={
-                "status": AccountsPayableStatus.PAID,
-                "data_pagamento": payload.data_pagamento,
-                "valor_pago": payload.valor_pago,
-                "observacao_pagamento": payload.observacao_pagamento,
-                "atualizado_em": datetime.now(UTC),
-            },
-            deep=True,
-        )
-        self._accounts_payable[accounts_payable_id] = paid_accounts_payable
-        return paid_accounts_payable.model_copy(deep=True)
-
-    def transition_status(
-        self,
-        accounts_payable_id: UUID,
-        status: AccountsPayableStatus,
-    ) -> AccountsPayableOut | None:
-        """Atualiza o status de uma conta a pagar."""
-
-        current = self._accounts_payable.get(accounts_payable_id)
-        if current is None:
-            return None
-
-        transitioned_accounts_payable = current.model_copy(
-            update={
-                "status": status,
-                "atualizado_em": datetime.now(UTC),
-            },
-            deep=True,
-        )
-        self._accounts_payable[accounts_payable_id] = transitioned_accounts_payable
-        return transitioned_accounts_payable.model_copy(deep=True)
+        return accounts_payable.model_copy(deep=True)
