@@ -1,0 +1,183 @@
+# Roteiro de Demo Técnica do MVP
+
+## Objetivo
+
+Demonstrar em 5 minutos:
+
+- o que a API faz;
+- como subir localmente;
+- como o fluxo principal funciona;
+- quais regras de negócio já estão implementadas;
+- o que ainda está fora do MVP atual.
+
+## Tempo total
+
+- `00:00 - 00:30` Contexto rápido
+- `00:30 - 01:10` Subida da aplicação
+- `01:10 - 03:20` Fluxo principal via terminal
+- `03:20 - 04:15` Testes automatizados
+- `04:15 - 05:00` Limitações e próximos passos
+
+---
+
+## 1. Contexto rápido (`00:00 - 00:30`)
+
+Fala sugerida:
+
+- "Este MVP implementa uma micro-API de contas a pagar."
+- "O foco é cadastro, consulta, atualização, cancelamento e pagamento."
+- "A arquitetura está separada em rotas, modelos, serviço e repositório."
+
+Comando opcional:
+
+```bash
+dir
+```
+
+---
+
+## 2. Subida da aplicação (`00:30 - 01:10`)
+
+### Opção principal
+
+```bash
+make run
+```
+
+### Opção fallback
+
+```bash
+py -3 -m uvicorn app.main:app --reload
+```
+
+### Validar saúde da aplicação
+
+```bash
+curl http://127.0.0.1:8000/
+```
+
+Resultado esperado:
+
+- status `200`
+- resposta com `sucesso: true`
+- status da aplicação `online`
+
+---
+
+## 3. Fluxo principal via terminal (`01:10 - 03:20`)
+
+### 3.1 Criar conta a pagar
+
+```bash
+curl -X POST http://127.0.0.1:8000/accounts-payable ^
+  -H "Content-Type: application/json" ^
+  -d "{\"descricao\":\"Pagamento de licenca SaaS\",\"fornecedor_ou_favorecido\":\"Fornecedor Cloud\",\"categoria\":\"Software\",\"valor_previsto\":\"299.90\",\"data_vencimento\":\"2026-05-05\",\"data_emissao\":\"2026-04-27\",\"centro_de_custo\":\"TI\",\"observacoes\":\"Assinatura anual parcelada\"}"
+```
+
+Pontos para comentar:
+
+- payload segue o domínio financeiro do MVP;
+- status inicial é `pending`;
+- resposta usa envelope padronizado.
+
+### 3.2 Listar contas
+
+```bash
+curl http://127.0.0.1:8000/accounts-payable
+```
+
+Pontos para comentar:
+
+- a conta criada aparece na listagem;
+- a API retorna coleção em JSON mesmo com zero ou mais itens.
+
+### 3.3 Consultar por id
+
+Use o `id` retornado na criação:
+
+```bash
+curl http://127.0.0.1:8000/accounts-payable/SEU_ID_AQUI
+```
+
+### 3.4 Atualizar dados permitidos
+
+```bash
+curl -X PUT http://127.0.0.1:8000/accounts-payable/SEU_ID_AQUI ^
+  -H "Content-Type: application/json" ^
+  -d "{\"descricao\":\"Pagamento de licenca SaaS - atualizado\",\"categoria\":\"Infraestrutura\"}"
+```
+
+Pontos para comentar:
+
+- atualização preserva o identificador;
+- regras de bloqueio existem para estados encerrados.
+
+### 3.5 Registrar pagamento
+
+```bash
+curl -X POST http://127.0.0.1:8000/accounts-payable/SEU_ID_AQUI/payment ^
+  -H "Content-Type: application/json" ^
+  -d "{\"data_pagamento\":\"2026-04-27\",\"valor_pago\":\"299.90\",\"observacao_pagamento\":\"Pagamento efetuado\"}"
+```
+
+Pontos para comentar:
+
+- status muda para `paid`;
+- valor pago deve bater com o valor previsto;
+- data de pagamento não pode ser futura.
+
+### 3.6 Mostrar erro coerente para recurso inexistente
+
+```bash
+curl http://127.0.0.1:8000/accounts-payable/00000000-0000-0000-0000-000000000000
+```
+
+Pontos para comentar:
+
+- retorno `404`;
+- erro padronizado no envelope HTTP.
+
+---
+
+## 4. Testes automatizados (`03:20 - 04:15`)
+
+### Rodar toda a suíte
+
+```bash
+make test
+```
+
+### Ou diretamente
+
+```bash
+py -3 -m pytest tests
+```
+
+Pontos para comentar:
+
+- há testes de serviço;
+- há testes de rotas com `TestClient`;
+- há testes do `PriorityAdvisor`;
+- existe `1 xfail` documentado para remoção física bloqueada.
+
+---
+
+## 5. Limitações e próximos passos (`04:15 - 05:00`)
+
+Fala sugerida:
+
+- "A API já cobre o fluxo principal do core."
+- "Ainda faltam autenticação, filtros, paginação e integração da prioridade por IA ao fluxo principal."
+- "O componente de IA existe, é testado, mas hoje ainda não decide o fluxo da API."
+
+### Comando opcional para abrir documentação
+
+```bash
+start http://127.0.0.1:8000/docs
+```
+
+---
+
+## Resumo final em uma frase
+
+"O MVP já demonstra um fluxo funcional e testado de contas a pagar com contrato HTTP consistente, regras de negócio básicas e base pronta para evolução."
