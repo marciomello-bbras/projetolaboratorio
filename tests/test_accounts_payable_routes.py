@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from datetime import date, timedelta
-from decimal import Decimal
 from uuid import uuid4
 
 import pytest
@@ -9,7 +8,6 @@ from fastapi.testclient import TestClient
 
 from app.api.accounts_payable_routes import get_accounts_payable_service
 from app.main import create_app
-from app.models.accounts_payable import AccountsPayableCreate
 from app.repositories.accounts_payable_repository import AccountsPayableRepository
 from app.services.accounts_payable_service import AccountsPayableService
 

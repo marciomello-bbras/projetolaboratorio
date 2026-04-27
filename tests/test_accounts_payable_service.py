@@ -225,6 +225,7 @@ def test_list_overdue_deve_sincronizar_status_vencido(
         service,
         conta_payload,
         data_vencimento=date.today() - timedelta(days=1),
+        data_emissao=date.today() - timedelta(days=2),
     )
 
     vencidas = service.list_overdue()
