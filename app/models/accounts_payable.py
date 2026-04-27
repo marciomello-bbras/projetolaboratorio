@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime
+from decimal import Decimal
 from enum import StrEnum
 from uuid import UUID
 
@@ -53,9 +54,11 @@ class AccountsPayableBase(BaseModel):
         max_length=100,
         description="Categoria da conta a pagar.",
     )
-    valor_previsto: float = Field(
+    valor_previsto: Decimal = Field(
         ...,
-        gt=0,
+        gt=Decimal("0"),
+        max_digits=12,
+        decimal_places=2,
         description="Valor previsto da conta a pagar.",
     )
     data_vencimento: date = Field(
@@ -97,6 +100,14 @@ class AccountsPayableBase(BaseModel):
         value = value.strip()
         return value or None
 
+    @model_validator(mode="after")
+    def validate_domain_dates(self) -> "AccountsPayableBase":
+        """Garante coerencia minima entre emissao e vencimento."""
+
+        if self.data_emissao is not None and self.data_emissao > self.data_vencimento:
+            raise ValueError("data_emissao nao pode ser posterior a data_vencimento")
+        return self
+
 
 class AccountsPayableCreate(AccountsPayableBase):
     """Payload de criacao da conta a pagar."""
@@ -129,9 +140,11 @@ class AccountsPayableUpdate(BaseModel):
         max_length=100,
         description="Categoria da conta a pagar.",
     )
-    valor_previsto: float | None = Field(
+    valor_previsto: Decimal | None = Field(
         default=None,
-        gt=0,
+        gt=Decimal("0"),
+        max_digits=12,
+        decimal_places=2,
         description="Valor previsto da conta a pagar.",
     )
     data_vencimento: date | None = Field(
@@ -181,6 +194,12 @@ class AccountsPayableUpdate(BaseModel):
 
         if self.model_dump(exclude_none=True) == {}:
             raise ValueError("informe ao menos um campo para atualizacao")
+        if (
+            self.data_emissao is not None
+            and self.data_vencimento is not None
+            and self.data_emissao > self.data_vencimento
+        ):
+            raise ValueError("data_emissao nao pode ser posterior a data_vencimento")
         return self
 
 
@@ -221,9 +240,11 @@ class AccountsPayablePaymentCreate(BaseModel):
         ...,
         description="Data em que o pagamento foi realizado.",
     )
-    valor_pago: float = Field(
+    valor_pago: Decimal = Field(
         ...,
-        gt=0,
+        gt=Decimal("0"),
+        max_digits=12,
+        decimal_places=2,
         description="Valor efetivamente pago.",
     )
     observacao_pagamento: str | None = Field(
@@ -243,6 +264,14 @@ class AccountsPayablePaymentCreate(BaseModel):
         value = value.strip()
         return value or None
 
+    @model_validator(mode="after")
+    def validate_payment_date(self) -> "AccountsPayablePaymentCreate":
+        """Bloqueia datas de pagamento futuras."""
+
+        if self.data_pagamento > date.today():
+            raise ValueError("data_pagamento nao pode estar no futuro")
+        return self
+
 
 class AccountsPayableOut(AccountsPayableBase):
     """Schema de resposta da conta a pagar."""
@@ -252,7 +281,7 @@ class AccountsPayableOut(AccountsPayableBase):
     id: UUID = Field(..., description="Identificador unico da conta a pagar.")
     status: AccountsPayableStatus = Field(..., description="Status do ciclo de vida da conta a pagar.")
     data_pagamento: date | None = Field(None, description="Data em que o pagamento foi realizado.")
-    valor_pago: float | None = Field(None, description="Valor efetivamente pago.")
+    valor_pago: Decimal | None = Field(None, description="Valor efetivamente pago.")
     observacao_pagamento: str | None = Field(None, description="Observacao opcional do pagamento.")
     criado_em: datetime = Field(..., description="Data e hora de criacao.")
     atualizado_em: datetime = Field(..., description="Data e hora da ultima atualizacao.")

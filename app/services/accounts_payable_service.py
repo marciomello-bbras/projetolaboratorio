@@ -43,18 +43,16 @@ class AccountsPayableService:
     def list(self) -> list[AccountsPayableOut]:
         """Lista todas as contas a pagar."""
 
-        return self._repository.list()
+        return [self._sync_overdue_status(accounts_payable) for accounts_payable in self._repository.list()]
 
     def list_overdue(self) -> list[AccountsPayableOut]:
         """Lista contas a pagar vencidas."""
 
-        overdue_accounts_payable: list[AccountsPayableOut] = []
-        for accounts_payable in self._repository.list():
-            if self._is_overdue(accounts_payable):
-                overdue_accounts_payable.append(
-                    accounts_payable.model_copy(update={"status": AccountsPayableStatus.OVERDUE}, deep=True)
-                )
-        return overdue_accounts_payable
+        return [
+            accounts_payable
+            for accounts_payable in self.list()
+            if accounts_payable.status == AccountsPayableStatus.OVERDUE
+        ]
 
     def get_by_id(self, accounts_payable_id: UUID) -> AccountsPayableOut:
         """Retorna uma conta a pagar pelo identificador."""
@@ -64,7 +62,7 @@ class AccountsPayableService:
             raise AccountsPayableNotFoundError(
                 f"conta a pagar '{accounts_payable_id}' nao encontrada"
             )
-        return accounts_payable
+        return self._sync_overdue_status(accounts_payable)
 
     def update(
         self,
@@ -78,13 +76,30 @@ class AccountsPayableService:
             raise AccountsPayableInvalidStateError(
                 "conta a pagar cancelada nao pode ser atualizada"
             )
+        if current_accounts_payable.status == AccountsPayableStatus.PAID:
+            raise AccountsPayableInvalidStateError(
+                "conta a pagar paga nao pode ser atualizada"
+            )
+
+        data_emissao = payload.data_emissao
+        if data_emissao is None:
+            data_emissao = current_accounts_payable.data_emissao
+
+        data_vencimento = payload.data_vencimento
+        if data_vencimento is None:
+            data_vencimento = current_accounts_payable.data_vencimento
+
+        if data_emissao is not None and data_emissao > data_vencimento:
+            raise AccountsPayableInvalidStateError(
+                "data_emissao nao pode ser posterior a data_vencimento"
+            )
 
         updated_accounts_payable = self._repository.update(accounts_payable_id, payload)
         if updated_accounts_payable is None:
             raise AccountsPayableNotFoundError(
                 f"conta a pagar '{accounts_payable_id}' nao encontrada"
             )
-        return updated_accounts_payable
+        return self._sync_overdue_status(updated_accounts_payable)
 
     def delete(self, accounts_payable_id: UUID) -> None:
         """Bloqueia a remocao fisica para preservar rastreabilidade."""
@@ -111,6 +126,19 @@ class AccountsPayableService:
         if current_accounts_payable.status == AccountsPayableStatus.PAID:
             raise AccountsPayableInvalidStateError(
                 "conta a pagar ja foi marcada como paga"
+            )
+
+        if payload.valor_pago != current_accounts_payable.valor_previsto:
+            raise AccountsPayableInvalidStateError(
+                "valor_pago deve ser igual ao valor_previsto para liquidar a conta"
+            )
+
+        if (
+            current_accounts_payable.data_emissao is not None
+            and payload.data_pagamento < current_accounts_payable.data_emissao
+        ):
+            raise AccountsPayableInvalidStateError(
+                "data_pagamento nao pode ser anterior a data_emissao"
             )
 
         paid_accounts_payable = self._repository.register_payment(accounts_payable_id, payload)
@@ -185,3 +213,30 @@ class AccountsPayableService:
 
         today = datetime.now(UTC).date()
         return accounts_payable.data_vencimento < today
+
+    def _sync_overdue_status(self, accounts_payable: AccountsPayableOut) -> AccountsPayableOut:
+        """Mantem o status vencido coerente com a data atual."""
+
+        if accounts_payable.status in {
+            AccountsPayableStatus.PAID,
+            AccountsPayableStatus.CANCELLED,
+        }:
+            return accounts_payable
+
+        expected_status = (
+            AccountsPayableStatus.OVERDUE
+            if self._is_overdue(accounts_payable)
+            else AccountsPayableStatus.PENDING
+        )
+        if accounts_payable.status == expected_status:
+            return accounts_payable
+
+        synchronized_accounts_payable = self._repository.transition_status(
+            accounts_payable.id,
+            expected_status,
+        )
+        if synchronized_accounts_payable is None:
+            raise AccountsPayableNotFoundError(
+                f"conta a pagar '{accounts_payable.id}' nao encontrada"
+            )
+        return synchronized_accounts_payable
