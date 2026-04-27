@@ -69,7 +69,7 @@ Descricao: Criar a base tecnica da aplicacao para suportar os endpoints do MVP.
 
 Criterios de aceite:
 - o projeto deve iniciar localmente sem ajustes manuais fora da configuracao prevista
-- a estrutura deve separar pelo menos camadas de entrada, dominio e persistencia
+- a estrutura deve separar pelo menos camadas de entrada e dominio
 - deve existir arquivo de configuracao de ambiente de exemplo
 
 ### RT02 - Modelar entidade de conta a pagar
@@ -77,18 +77,9 @@ Descricao: Criar o modelo de dados principal da aplicacao.
 
 Criterios de aceite:
 - a entidade deve refletir os campos obrigatorios do escopo
-- deve existir persistencia dos dados em banco ou armazenamento definido
 - o modelo deve suportar os status `PENDENTE`, `PAGA`, `VENCIDA` e `CANCELADA`
 
-### RT03 - Implementar persistencia inicial
-Descricao: Disponibilizar mecanismo de armazenamento para o fluxo core.
-
-Criterios de aceite:
-- registros criados devem permanecer disponiveis apos reinicio da aplicacao, quando aplicavel ao ambiente escolhido
-- deve ser possivel buscar registros por identificador
-- deve ser possivel atualizar e consultar registros sem perda de consistencia
-
-### RT04 - Padronizar respostas e erros HTTP
+### RT03 - Padronizar respostas e erros HTTP
 Descricao: Definir contrato minimo de resposta da API.
 
 Criterios de aceite:
@@ -129,11 +120,11 @@ Descricao: Garantir consistencia minima das operacoes do dominio.
 
 Criterios de aceite:
 - nao deve ser permitido cadastrar conta com `valor_previsto` menor ou igual a zero
-- campos obrigatorios devem ser validados antes da persistencia
+- campos obrigatorios devem ser validados antes do processamento da operacao
 - conta paga nao deve retornar para `PENDENTE`
 - a API deve responder com mensagem objetiva quando uma regra for violada
 
-### RT05 - Implementar autenticacao interna simples
+### RT04 - Implementar autenticacao interna simples
 Descricao: Proteger os endpoints para uso interno.
 
 Criterios de aceite:
@@ -141,16 +132,7 @@ Criterios de aceite:
 - o mecanismo escolhido deve ser simples e documentado
 - endpoints protegidos devem responder com erro coerente em caso de acesso nao autorizado
 
-### RT06 - Adicionar logs basicos
-Descricao: Registrar eventos essenciais para operacao e diagnostico.
-
-Criterios de aceite:
-- deve haver log de requisicoes recebidas
-- deve haver log de falhas de validacao
-- deve haver log de erros de processamento
-- deve haver log de alteracao de status
-
-### RT07 - Criar testes automatizados minimos
+### RT05 - Criar testes automatizados minimos
 Descricao: Garantir cobertura das regras mais criticas do fluxo.
 
 Criterios de aceite:
@@ -159,7 +141,7 @@ Criterios de aceite:
 - deve haver testes para registro de pagamento
 - deve haver testes para bloqueio de operacoes invalidas relevantes
 
-### RT08 - Documentar endpoints da API
+### RT06 - Documentar endpoints da API
 Descricao: Publicar documentacao tecnica minima para consumo interno.
 
 Criterios de aceite:
@@ -186,7 +168,7 @@ Criterios de aceite:
 - o fluxo completo deve funcionar com autenticacao habilitada
 - os estados finais apresentados pela API devem ser coerentes com as operacoes executadas
 
-### RT09 - Configurar ambiente de execucao final
+### RT07 - Configurar ambiente de execucao final
 Descricao: Consolidar parametros e instrucoes necessarias para subir o servico.
 
 Criterios de aceite:
@@ -194,7 +176,7 @@ Criterios de aceite:
 - dependencias e parametros obrigatorios devem estar documentados
 - o ambiente definido deve ser suficiente para demonstracao interna controlada
 
-### RT10 - Executar validacao final da release
+### RT08 - Executar validacao final da release
 Descricao: Realizar checklist final de conformidade com o escopo do MVP.
 
 Criterios de aceite:
@@ -205,15 +187,15 @@ Criterios de aceite:
 ## Resumo por Release
 ### Core
 - RF01 a RF06
-- RT01 a RT04
+- RT01 a RT03
 
 ### Qualidade
 - RF07 a RF10
-- RT05 a RT08
+- RT04 a RT06
 
 ### Entrega final
 - RF11 a RF12
-- RT09 a RT10
+- RT07 a RT08
 
 ## Definicao Minima de Pronto
 Um item do backlog sera considerado pronto quando:

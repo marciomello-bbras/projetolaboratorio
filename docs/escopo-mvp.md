@@ -6,7 +6,7 @@ Disponibilizar uma micro-API para suportar o processo interno de contas a pagar 
 O MVP deve atender o fluxo operacional essencial, reduzindo controles manuais dispersos e permitindo que sistemas internos ou interfaces futuras consumam uma base padronizada de dados financeiros a pagar.
 
 ## Escopo do MVP
-O produto cobre o ciclo minimo de uma conta a pagar, desde o cadastro ate a marcacao como paga ou cancelada, com persistencia dos dados e exposicao por API HTTP.
+O produto cobre o ciclo minimo de uma conta a pagar, desde o cadastro ate a marcacao como paga ou cancelada, com exposicao por API HTTP.
 
 O foco do MVP e validar a operacao interna com baixo custo de implementacao, priorizando simplicidade, rastreabilidade basica e consistencia dos registros.
 
@@ -93,35 +93,24 @@ A solucao deve ser implementada como micro-API REST, com responsabilidades restr
 ### RNF02 - Formato de dados
 As entradas e saidas devem utilizar JSON.
 
-### RNF03 - Persistencia
-Os dados devem ser persistidos em base relacional ou nao relacional, desde que haja suporte a consultas por status, vencimento e fornecedor.
-
-### RNF04 - Seguranca minima
+### RNF03 - Seguranca minima
 O acesso a API deve exigir autenticacao para uso interno, mesmo que simplificada no MVP, como token estatico, API key ou mecanismo equivalente.
 
-### RNF05 - Validacao e tratamento de erros
+### RNF04 - Validacao e tratamento de erros
 A API deve retornar codigos HTTP coerentes, mensagens objetivas de erro e validacoes de entrada consistentes.
 
-### RNF06 - Observabilidade minima
-O servico deve possuir logs basicos para:
-
-- requisicoes recebidas
-- falhas de validacao
-- erros de processamento
-- alteracoes de status
-
-### RNF07 - Desempenho
+### RNF05 - Desempenho
 O MVP deve responder adequadamente ao uso de uma equipe interna, priorizando estabilidade e previsibilidade sobre otimizacoes complexas.
 
 Como referencia inicial, a API deve suportar volumes baixos a moderados sem degradacao perceptivel para o usuario interno.
 
-### RNF08 - Manutenibilidade
+### RNF06 - Manutenibilidade
 O codigo deve ser organizado de forma simples e modular, permitindo evolucao futura para integracoes, aprovacoes e relatórios.
 
-### RNF09 - Documentacao da API
+### RNF07 - Documentacao da API
 O MVP deve possuir documentacao minima dos endpoints, payloads, respostas e codigos de erro, preferencialmente em formato OpenAPI ou equivalente.
 
-### RNF10 - Ambiente
+### RNF08 - Ambiente
 A solucao deve ser executavel em ambiente interno padronizado, com configuracao por variaveis de ambiente e sem dependencia de intervencoes manuais frequentes.
 
 ## Fora do Escopo
@@ -148,4 +137,4 @@ O MVP sera considerado aderente ao escopo quando permitir:
 - atualizar dados permitidos
 - registrar pagamento e refletir o status correspondente
 - identificar contas pendentes, pagas, canceladas e vencidas
-- operar com autenticacao interna simples e persistencia confiavel
+- operar com autenticacao interna simples

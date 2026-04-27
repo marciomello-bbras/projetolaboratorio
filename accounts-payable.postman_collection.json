@@ -1,0 +1,361 @@
+{
+  "info": {
+    "_postman_id": "8a2cf6b1-1d2b-4f26-8af0-3d4f7e0f5a21",
+    "name": "Accounts Payable API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Colecao Postman para a micro-API de contas a pagar."
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://127.0.0.1:8000"
+    },
+    {
+      "key": "accountsPayableId",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "Health Check",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            ""
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 200\", function () {",
+              "  pm.response.to.have.status(200);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Create Accounts Payable",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"descricao\": \"Pagamento de licenca SaaS\",\n  \"fornecedor_ou_favorecido\": \"Fornecedor Cloud\",\n  \"categoria\": \"Software\",\n  \"valor_previsto\": \"299.90\",\n  \"data_vencimento\": \"2026-05-05\",\n  \"data_emissao\": \"2026-04-27\",\n  \"centro_de_custo\": \"TI\",\n  \"observacoes\": \"Assinatura anual parcelada\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/accounts-payable",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "accounts-payable"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 201\", function () {",
+              "  pm.response.to.have.status(201);",
+              "});",
+              "",
+              "const json = pm.response.json();",
+              "if (json && json.dados && json.dados.id) {",
+              "  pm.collectionVariables.set(\"accountsPayableId\", json.dados.id);",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "List Accounts Payable",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/accounts-payable",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "accounts-payable"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 200\", function () {",
+              "  pm.response.to.have.status(200);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Get Accounts Payable By Id",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/accounts-payable/{{accountsPayableId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "accounts-payable",
+            "{{accountsPayableId}}"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 200\", function () {",
+              "  pm.response.to.have.status(200);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Update Accounts Payable",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"descricao\": \"Pagamento de licenca SaaS - atualizado\",\n  \"categoria\": \"Infraestrutura\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/accounts-payable/{{accountsPayableId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "accounts-payable",
+            "{{accountsPayableId}}"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 200\", function () {",
+              "  pm.response.to.have.status(200);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Register Payment",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"data_pagamento\": \"2026-04-27\",\n  \"valor_pago\": \"299.90\",\n  \"observacao_pagamento\": \"Pagamento efetuado com sucesso\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/accounts-payable/{{accountsPayableId}}/payment",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "accounts-payable",
+            "{{accountsPayableId}}",
+            "payment"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 200\", function () {",
+              "  pm.response.to.have.status(200);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Transition Status",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"status\": \"cancelled\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/accounts-payable/{{accountsPayableId}}/status",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "accounts-payable",
+            "{{accountsPayableId}}",
+            "status"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 200\", function () {",
+              "  pm.response.to.have.status(200);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Cancel Accounts Payable",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/accounts-payable/{{accountsPayableId}}/cancel",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "accounts-payable",
+            "{{accountsPayableId}}",
+            "cancel"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 200\", function () {",
+              "  pm.response.to.have.status(200);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "List Overdue Accounts Payable",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/accounts-payable/overdue",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "accounts-payable",
+            "overdue"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 200\", function () {",
+              "  pm.response.to.have.status(200);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Delete Accounts Payable",
+      "request": {
+        "method": "DELETE",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/accounts-payable/{{accountsPayableId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "accounts-payable",
+            "{{accountsPayableId}}"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 409\", function () {",
+              "  pm.response.to.have.status(409);",
+              "});"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

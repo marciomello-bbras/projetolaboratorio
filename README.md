@@ -41,9 +41,9 @@ app/
     priority_advisor.py
   main.py
 tests/
-  tests_accounts-payable_routes.py
-  tests_accounts_payable_service.py
-  tests_priority_advisor.py
+  test_accounts_payable_routes.py
+  test_accounts_payable_service.py
+  test_priority_advisor.py
 docs/
   escopo-mvp.md
   backlog.md
@@ -52,7 +52,7 @@ docs/
 
 ## Instalação
 
-Como ainda não existe um arquivo de dependências versionado, a instalação é manual.
+As dependências do projeto estão centralizadas em `requirements.txt`.
 
 ### 1. Criar e ativar ambiente virtual
 
@@ -66,7 +66,7 @@ py -3 -m venv .venv
 ### 2. Instalar dependências
 
 ```bash
-py -3 -m pip install fastapi uvicorn pytest
+py -3 -m pip install -r requirements.txt
 ```
 
 Se quiser habilitar o componente de prioridade com chamada externa, configure também a credencial da API usada pelo `PriorityAdvisor`.
@@ -155,7 +155,7 @@ O projeto segue uma separação simples por camadas:
 - `api`: rotas FastAPI e contrato HTTP
 - `models`: schemas e validações com Pydantic
 - `services`: regras de negócio
-- `repositories`: persistência em memória
+- `repositories`: armazenamento em memória para o fluxo atual do MVP
 
 Fluxo resumido:
 
@@ -223,34 +223,28 @@ py -3 -m pytest tests
 Executar um arquivo específico:
 
 ```bash
-py -3 -m pytest tests/tests_accounts_payable_service.py
-py -3 -m pytest tests/tests_priority_advisor.py
-py -3 -m pytest tests/tests_accounts-payable_routes.py
+py -3 -m pytest tests/test_accounts_payable_service.py
+py -3 -m pytest tests/test_priority_advisor.py
+py -3 -m pytest tests/test_accounts_payable_routes.py
 ```
 
-Observação: no ambiente atual da máquina, `pytest` precisa estar instalado manualmente.
+Observação: há um teste marcado como `xfail` no fluxo de remoção, porque a API atualmente bloqueia `DELETE` para preservar rastreabilidade.
 
 ## Limitações atuais
 
 Estado atual do MVP ainda possui limitações importantes:
 
-- persistência em memória, sem banco de dados;
 - ausência de autenticação nos endpoints;
-- ausência de logs básicos de operação;
-- ausência de arquivo de dependências versionado (`requirements.txt` ou `pyproject.toml`);
 - listagem ainda sem filtros, paginação e ordenação do backlog;
 - documentação técnica ainda concentrada no README e no OpenAPI gerado;
 - componente de prioridade por IA ainda não conectado ao fluxo principal da API.
 
 ## Próximos passos
 
-- adicionar arquivo de dependências do projeto;
-- implementar persistência real;
 - habilitar autenticação interna simples;
 - adicionar filtros, paginação e ordenação;
 - integrar a prioridade assistida por IA ao fluxo principal de negócio;
 - ampliar cobertura de testes e pipeline de validação;
-- incluir observabilidade básica e logging;
 - consolidar documentação funcional e técnica da release final.
 
 ## Documentos de apoio
