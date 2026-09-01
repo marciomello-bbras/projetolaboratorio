@@ -49,6 +49,16 @@ docs/
   escopo-mvp.md
   backlog.md
   diagrama-componentes.md
+  adr/
+    README.md
+    0001-micro-api-rest-fastapi.md
+    0002-arquitetura-em-camadas.md
+    0003-persistencia-em-memoria.md
+    0004-bloqueio-remocao-fisica.md
+    0005-envelope-padrao-http.md
+    0006-priority-advisor-desacoplado.md
+    0007-sincronizacao-overdue-na-leitura.md
+    0008-autenticacao-adiada.md
 ```
 
 ## Instalação
@@ -255,7 +265,57 @@ Arquivos principais:
 - `app/repositories/accounts_payable_repository.py`: armazenamento em memória
 - `app/services/priority_advisor.py`: heurística local e chamada opcional de IA
 
-Fluxo resumido:
+Os diagramas abaixo estão em Mermaid e renderizam neste README (GitHub, GitLab ou visualizador Markdown compatível). A cópia de apoio fica em `docs/diagrama-componentes.md`. As decisões que sustentam esse desenho estão em `docs/adr/`.
+
+### Diagrama estrutural — contexto do sistema (C4 Nível 1)
+
+Descrição: a equipe de finanças (ou um sistema interno) consome a micro-API por HTTP/JSON para operar o ciclo mínimo de contas a pagar. O `PriorityAdvisor` existe no repositório, mas ainda não participa das rotas. Quando `OPENAI_API_KEY` estiver configurada, ele pode consultar a API da OpenAI, com fallback local.
+
+```mermaid
+C4Context
+    title Contexto do sistema — Micro-API de Contas a Pagar
+
+    Person(financeiro, "Equipe de finanças", "Usuário interno que cadastra, consulta, cancela e liquida contas.")
+    Person_Ext(cliente_http, "Cliente HTTP / Postman / Swagger", "Consome o contrato OpenAPI para operação e demonstração.")
+
+    System(api, "Micro-API de Contas a Pagar", "MVP REST em FastAPI: cadastro, consulta, atualização, cancelamento e pagamento.")
+
+    System_Ext(openai, "API OpenAI", "Sugestão remota de prioridade. Uso opcional e ainda fora do fluxo principal.")
+
+    Rel(financeiro, api, "Opera contas a pagar", "HTTP/JSON")
+    Rel(cliente_http, api, "Explora e testa o contrato", "OpenAPI / REST")
+    Rel_D(api, openai, "Chamada futura/opcional do PriorityAdvisor", "HTTPS, se OPENAI_API_KEY")
+```
+
+### Diagrama estrutural — visão de containers (C4 Nível 2)
+
+Descrição: um único processo Python (Uvicorn + FastAPI) concentra a API. A camada de aplicação aplica as regras de domínio. A persistência do MVP é um dicionário em memória, sem banco externo. O `PriorityAdvisor` é um container lógico preparado, ainda desconectado das rotas.
+
+```mermaid
+C4Container
+    title Containers — Micro-API de Contas a Pagar
+
+    Person(financeiro, "Equipe de finanças", "Operação interna de contas a pagar.")
+
+    System_Boundary(sistema, "Micro-API de Contas a Pagar") {
+        Container(web, "API HTTP", "Uvicorn + FastAPI", "Expõe /accounts-payable, health check, OpenAPI e handlers globais de erro.")
+        Container(app, "Aplicação de domínio", "AccountsPayableService + schemas Pydantic", "Valida entrada, aplica regras de estado e orquestra persistência.")
+        Container(advisor, "PriorityAdvisor", "Heurística local + LLM opcional", "Componente preparado e testado; ainda não integrado às rotas.")
+        ContainerDb(store, "Repositório em memória", "dict[UUID, AccountsPayableOut]", "Persistência volátil do MVP. Reinício da API apaga os registros.")
+    }
+
+    System_Ext(openai, "API OpenAI", "Prioridade remota com timeout curto e fallback local.")
+
+    Rel(financeiro, web, "CRUD operacional e liquidação", "HTTP/JSON")
+    Rel(web, app, "Delega casos de uso", "chamada síncrona")
+    Rel(app, store, "Cria, lê, atualiza e liquida", "acesso em processo")
+    Rel_D(app, advisor, "Integração planejada", "ainda não conectada")
+    Rel_D(advisor, openai, "Sugestão remota opcional", "HTTPS")
+```
+
+### Diagrama estrutural — componentes internos
+
+Descrição: detalha o caminho real da requisição dentro do processo. A rota valida o contrato com Pydantic, o serviço aplica regras e o repositório grava em memória. O advisor permanece fora do caminho feliz atual.
 
 ```mermaid
 flowchart LR
@@ -270,10 +330,106 @@ flowchart LR
     Routes --> Schemas
     Schemas --> Service
     Service --> Repository
-    Service -. opcional .-> Advisor
+    Service -. ainda não integrado .-> Advisor
     Repository --> Service
     Service --> Routes
     Routes --> Client
+```
+
+### Diagrama comportamental — jornada crítica de liquidação
+
+Descrição: a jornada crítica do MVP é o registro de pagamento (`POST /accounts-payable/{id}/payment`). Ela fecha o ciclo operacional: a conta precisa existir, estar em estado pagável (`pending` ou `overdue`) e o `valor_pago` deve ser igual ao `valor_previsto`. Datas futuras e contas já pagas ou canceladas são rejeitadas.
+
+Caminho feliz: payload válido → conta encontrada → regras de liquidação ok → status `paid` persistido → `200` com envelope de sucesso.
+
+Desvios: `422` na validação do contrato; `404` se o identificador não existir; `409` se o estado ou o valor impedirem a liquidação.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Cliente as Cliente HTTP
+    participant API as FastAPI / rotas
+    participant Schema as Pydantic<br/>AccountsPayablePaymentCreate
+    participant Svc as AccountsPayableService
+    participant Repo as AccountsPayableRepository
+
+    Cliente->>API: POST /accounts-payable/{id}/payment<br/>data_pagamento, valor_pago, observacao_pagamento
+    API->>Schema: valida contrato JSON
+
+    alt data_pagamento no futuro ou valor_pago <= 0
+        Schema-->>API: RequestValidationError
+        API-->>Cliente: 422 erro_validacao
+    else payload válido
+        API->>Svc: register_payment(id, payload)
+        Svc->>Repo: get_by_id(id)
+
+        alt conta inexistente
+            Repo-->>Svc: None
+            Svc-->>API: AccountsPayableNotFoundError
+            API-->>Cliente: 404 conta_nao_encontrada
+        else conta encontrada
+            Repo-->>Svc: AccountsPayableOut
+            Svc->>Svc: sincroniza overdue e aplica _ensure_payable
+
+            alt cancelada, já paga, valor diferente ou data anterior à emissão
+                Svc-->>API: AccountsPayableInvalidStateError
+                API-->>Cliente: 409 estado_invalido
+            else liquidação permitida
+                Svc->>Repo: register_payment(id, payload)
+                Repo-->>Svc: conta com status paid
+                Svc-->>API: AccountsPayableOut
+                API-->>Cliente: 200 Pagamento registrado com sucesso.
+            end
+        end
+    end
+```
+
+### Diagrama comportamental — atividades do ciclo operacional
+
+Descrição: o diagrama de atividades mostra o fluxo de trabalho da conta a pagar, do cadastro até um estado terminal (`paid` ou `cancelled`). Consultas sincronizam vencidas automaticamente. Atualização e pagamento só seguem se a conta não estiver paga nem cancelada. A remoção física não aparece como caminho válido: a API bloqueia `DELETE` e exige cancelamento para preservar rastreabilidade.
+
+```mermaid
+flowchart TD
+    startNode([Início]) --> cadastrar["Cadastrar conta<br/>POST /accounts-payable"]
+    cadastrar --> validaCadastro{"Contrato válido?<br/>campos obrigatórios, valor &gt; 0,<br/>emissão ≤ vencimento"}
+
+    validaCadastro -->|não| erro422["Retornar 422 erro_validacao"]
+    erro422 --> fimErro([Fim])
+
+    validaCadastro -->|sim| persistir["Persistir conta com status pending"]
+    persistir --> consultar{"Consultar ou listar?"}
+
+    consultar -->|sim| syncVencida{"data_vencimento &lt; hoje<br/>e status não terminal?"}
+    consultar -->|não| decidirAcao
+    syncVencida -->|sim| marcarOverdue["Sincronizar status overdue"]
+    syncVencida -->|não| decidirAcao
+    marcarOverdue --> decidirAcao{"Próxima ação operacional"}
+
+    decidirAcao -->|atualizar dados| podeAtualizar{"Status pago ou cancelado?"}
+    podeAtualizar -->|sim| erro409upd["Retornar 409 estado_invalido"]
+    podeAtualizar -->|não| atualizar["Atualizar campos permitidos"]
+    atualizar --> decidirAcao
+    erro409upd --> fimErro
+
+    decidirAcao -->|cancelar| podeCancelar{"Status já pago ou cancelado?"}
+    podeCancelar -->|sim| erro409can["Retornar 409 estado_invalido"]
+    podeCancelar -->|não| cancelar["Transicionar para cancelled"]
+    cancelar --> fimCancelada([Fim — conta cancelada])
+    erro409can --> fimErro
+
+    decidirAcao -->|registrar pagamento| validaPagto{"Payload válido?<br/>valor_pago &gt; 0 e<br/>data_pagamento não futura"}
+    validaPagto -->|não| erro422pag["Retornar 422 erro_validacao"]
+    erro422pag --> fimErro
+    validaPagto -->|sim| existeConta{"Conta encontrada?"}
+    existeConta -->|não| erro404["Retornar 404 conta_nao_encontrada"]
+    erro404 --> fimErro
+    existeConta -->|sim| podePagar{"Pagável?<br/>não paga, não cancelada,<br/>valor_pago = valor_previsto,<br/>data ≥ emissão"}
+    podePagar -->|não| erro409pag["Retornar 409 estado_invalido"]
+    erro409pag --> fimErro
+    podePagar -->|sim| liquidar["Persistir pagamento<br/>e status paid"]
+    liquidar --> fimPaga([Fim — conta liquidada])
+
+    decidirAcao -->|encerrar consulta| fimConsulta([Fim — conta consultada])
 ```
 
 ## Uso de IA
@@ -380,11 +536,29 @@ Estado atual do MVP ainda possui limitações importantes:
 - ampliar cobertura de testes e pipeline de validação;
 - consolidar documentação funcional e técnica da release final.
 
+## Decisões de arquitetura (ADR)
+
+As escolhas vigentes do MVP estão registradas em `docs/adr/`. Cada ADR descreve contexto, decisão, alternativas e consequências.
+
+| ID | Decisão |
+|----|---------|
+| [ADR-0001](docs/adr/0001-micro-api-rest-fastapi.md) | Micro-API REST com FastAPI |
+| [ADR-0002](docs/adr/0002-arquitetura-em-camadas.md) | Arquitetura em camadas |
+| [ADR-0003](docs/adr/0003-persistencia-em-memoria.md) | Persistência em memória |
+| [ADR-0004](docs/adr/0004-bloqueio-remocao-fisica.md) | Bloqueio de remoção física |
+| [ADR-0005](docs/adr/0005-envelope-padrao-http.md) | Envelope HTTP padronizado |
+| [ADR-0006](docs/adr/0006-priority-advisor-desacoplado.md) | PriorityAdvisor desacoplado, com fallback |
+| [ADR-0007](docs/adr/0007-sincronizacao-overdue-na-leitura.md) | Sincronização de vencidas na leitura |
+| [ADR-0008](docs/adr/0008-autenticacao-adiada.md) | Autenticação adiada |
+
+Índice: [`docs/adr/README.md`](docs/adr/README.md).
+
 ## Documentos de apoio
 
 - `docs/escopo-mvp.md`
 - `docs/backlog.md`
 - `docs/diagrama-componentes.md`
+- `docs/adr/README.md`
 
 ## Status do projeto
 
