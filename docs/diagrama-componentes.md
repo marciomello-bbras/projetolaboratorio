@@ -2,7 +2,7 @@
 
 Fonte canônica no README: seção **Arquitetura**.
 
-Os blocos usam `flowchart` e `sequenceDiagram` para renderizar no GitHub. A visão estrutural é inspirada no C4, mas não usa `C4Context`/`C4Container`: o renderer do GitHub não desenha esses tipos e o preview fica em carregamento.
+Os blocos usam `flowchart` e `sequenceDiagram` para renderizar no GitHub. A visão estrutural é inspirada no C4, sem `C4Context`/`C4Container`, sem HTML nos nós e sem o formato de cilindro `[( )]`.
 
 O desenho reflete o código versionado: persistência em memória, `PriorityAdvisor` preparado e ainda fora das rotas, e liquidação como jornada crítica.
 
@@ -12,14 +12,14 @@ A equipe de finanças consome a micro-API por HTTP/JSON. A OpenAI é um sistema 
 
 ```mermaid
 flowchart TB
-    financeiro["Equipe de financas<br/>usuario interno"]
-    cliente["Cliente HTTP / Postman / Swagger"]
-    api["Micro-API de Contas a Pagar<br/>MVP REST em FastAPI"]
-    openai["API OpenAI<br/>sistema externo opcional"]
+    financeiro[Equipe de financas]
+    cliente[Cliente HTTP Postman Swagger]
+    api[Micro-API de Contas a Pagar]
+    openai[API OpenAI opcional]
 
-    financeiro -->|"HTTP/JSON"| api
-    cliente -->|"OpenAPI / REST"| api
-    api -.->|"HTTPS se OPENAI_API_KEY"| openai
+    financeiro -->|HTTP JSON| api
+    cliente -->|OpenAPI REST| api
+    api -.->|HTTPS se OPENAI_API_KEY| openai
 ```
 
 ## Visao de containers (C4 Nível 2)
@@ -28,22 +28,20 @@ Um processo Python concentra API, dominio e persistencia volatil. O advisor e um
 
 ```mermaid
 flowchart TB
-    financeiro["Equipe de financas"]
-
-    subgraph sistema["Micro-API de Contas a Pagar"]
-        web["API HTTP<br/>Uvicorn + FastAPI"]
-        app["Aplicacao de dominio<br/>AccountsPayableService + Pydantic"]
-        advisor["PriorityAdvisor<br/>heuristica local + LLM opcional"]
-        store[("Repositorio em memoria")]
+    financeiro[Equipe de financas]
+    subgraph sistema [Micro-API de Contas a Pagar]
+        web[API HTTP FastAPI]
+        app[Aplicacao de dominio]
+        advisor[PriorityAdvisor]
+        store[Repositorio em memoria]
     end
+    openai[API OpenAI opcional]
 
-    openai["API OpenAI<br/>externo opcional"]
-
-    financeiro -->|"HTTP/JSON"| web
-    web -->|"chamada sincrona"| app
-    app -->|"acesso em processo"| store
-    app -.->|"ainda nao conectada"| advisor
-    advisor -.->|"HTTPS opcional"| openai
+    financeiro -->|HTTP JSON| web
+    web -->|chamada sincrona| app
+    app -->|acesso em processo| store
+    app -.->|ainda nao conectada| advisor
+    advisor -.->|HTTPS opcional| openai
 ```
 
 ## Componentes internos

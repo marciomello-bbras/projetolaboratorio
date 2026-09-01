@@ -265,7 +265,7 @@ Arquivos principais:
 - `app/repositories/accounts_payable_repository.py`: armazenamento em memória
 - `app/services/priority_advisor.py`: heurística local e chamada opcional de IA
 
-Os diagramas abaixo estão em Mermaid (`flowchart` e `sequenceDiagram`), que o GitHub renderiza no README. A visão estrutural é inspirada no C4 (contexto e containers), mas usa `flowchart` porque o renderer do GitHub não desenha `C4Context`/`C4Container` e o preview fica em carregamento. A cópia de apoio fica em `docs/diagrama-componentes.md`. As decisões que sustentam esse desenho estão em `docs/adr/`.
+Os diagramas abaixo estão em Mermaid (`flowchart` e `sequenceDiagram`). A visão estrutural é inspirada no C4, com sintaxe que o GitHub consegue desenhar: sem `C4Context`/`C4Container`, sem HTML nos nós e sem o formato de cilindro `[( )]`. A cópia de apoio fica em `docs/diagrama-componentes.md`. As decisões que sustentam esse desenho estão em `docs/adr/`.
 
 ### Diagrama estrutural — contexto do sistema (C4 Nível 1)
 
@@ -273,14 +273,14 @@ Descrição: a equipe de finanças (ou um sistema interno) consome a micro-API p
 
 ```mermaid
 flowchart TB
-    financeiro["Equipe de financas<br/>usuario interno"]
-    cliente["Cliente HTTP / Postman / Swagger"]
-    api["Micro-API de Contas a Pagar<br/>MVP REST em FastAPI"]
-    openai["API OpenAI<br/>sistema externo opcional"]
+    financeiro[Equipe de financas]
+    cliente[Cliente HTTP Postman Swagger]
+    api[Micro-API de Contas a Pagar]
+    openai[API OpenAI opcional]
 
-    financeiro -->|"HTTP/JSON"| api
-    cliente -->|"OpenAPI / REST"| api
-    api -.->|"HTTPS se OPENAI_API_KEY"| openai
+    financeiro -->|HTTP JSON| api
+    cliente -->|OpenAPI REST| api
+    api -.->|HTTPS se OPENAI_API_KEY| openai
 ```
 
 ### Diagrama estrutural — visão de containers (C4 Nível 2)
@@ -289,22 +289,20 @@ Descrição: um único processo Python (Uvicorn + FastAPI) concentra a API. A ca
 
 ```mermaid
 flowchart TB
-    financeiro["Equipe de financas"]
-
-    subgraph sistema["Micro-API de Contas a Pagar"]
-        web["API HTTP<br/>Uvicorn + FastAPI"]
-        app["Aplicacao de dominio<br/>AccountsPayableService + Pydantic"]
-        advisor["PriorityAdvisor<br/>heuristica local + LLM opcional"]
-        store[("Repositorio em memoria")]
+    financeiro[Equipe de financas]
+    subgraph sistema [Micro-API de Contas a Pagar]
+        web[API HTTP FastAPI]
+        app[Aplicacao de dominio]
+        advisor[PriorityAdvisor]
+        store[Repositorio em memoria]
     end
+    openai[API OpenAI opcional]
 
-    openai["API OpenAI<br/>externo opcional"]
-
-    financeiro -->|"HTTP/JSON"| web
-    web -->|"chamada sincrona"| app
-    app -->|"acesso em processo"| store
-    app -.->|"ainda nao conectada"| advisor
-    advisor -.->|"HTTPS opcional"| openai
+    financeiro -->|HTTP JSON| web
+    web -->|chamada sincrona| app
+    app -->|acesso em processo| store
+    app -.->|ainda nao conectada| advisor
+    advisor -.->|HTTPS opcional| openai
 ```
 
 ### Diagrama estrutural — componentes internos
