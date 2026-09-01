@@ -265,26 +265,22 @@ Arquivos principais:
 - `app/repositories/accounts_payable_repository.py`: armazenamento em memória
 - `app/services/priority_advisor.py`: heurística local e chamada opcional de IA
 
-Os diagramas abaixo estão em Mermaid e renderizam neste README (GitHub, GitLab ou visualizador Markdown compatível). A cópia de apoio fica em `docs/diagrama-componentes.md`. As decisões que sustentam esse desenho estão em `docs/adr/`.
+Os diagramas abaixo estão em Mermaid (`flowchart` e `sequenceDiagram`), que o GitHub renderiza no README. A visão estrutural é inspirada no C4 (contexto e containers), mas usa `flowchart` porque o renderer do GitHub não desenha `C4Context`/`C4Container` e o preview fica em carregamento. A cópia de apoio fica em `docs/diagrama-componentes.md`. As decisões que sustentam esse desenho estão em `docs/adr/`.
 
 ### Diagrama estrutural — contexto do sistema (C4 Nível 1)
 
 Descrição: a equipe de finanças (ou um sistema interno) consome a micro-API por HTTP/JSON para operar o ciclo mínimo de contas a pagar. O `PriorityAdvisor` existe no repositório, mas ainda não participa das rotas. Quando `OPENAI_API_KEY` estiver configurada, ele pode consultar a API da OpenAI, com fallback local.
 
 ```mermaid
-C4Context
-    title Contexto do sistema — Micro-API de Contas a Pagar
+flowchart TB
+    financeiro["Equipe de financas<br/>usuario interno"]
+    cliente["Cliente HTTP / Postman / Swagger"]
+    api["Micro-API de Contas a Pagar<br/>MVP REST em FastAPI"]
+    openai["API OpenAI<br/>sistema externo opcional"]
 
-    Person(financeiro, "Equipe de finanças", "Usuário interno que cadastra, consulta, cancela e liquida contas.")
-    Person_Ext(cliente_http, "Cliente HTTP / Postman / Swagger", "Consome o contrato OpenAPI para operação e demonstração.")
-
-    System(api, "Micro-API de Contas a Pagar", "MVP REST em FastAPI: cadastro, consulta, atualização, cancelamento e pagamento.")
-
-    System_Ext(openai, "API OpenAI", "Sugestão remota de prioridade. Uso opcional e ainda fora do fluxo principal.")
-
-    Rel(financeiro, api, "Opera contas a pagar", "HTTP/JSON")
-    Rel(cliente_http, api, "Explora e testa o contrato", "OpenAPI / REST")
-    Rel_D(api, openai, "Chamada futura/opcional do PriorityAdvisor", "HTTPS, se OPENAI_API_KEY")
+    financeiro -->|"HTTP/JSON"| api
+    cliente -->|"OpenAPI / REST"| api
+    api -.->|"HTTPS se OPENAI_API_KEY"| openai
 ```
 
 ### Diagrama estrutural — visão de containers (C4 Nível 2)
@@ -292,25 +288,23 @@ C4Context
 Descrição: um único processo Python (Uvicorn + FastAPI) concentra a API. A camada de aplicação aplica as regras de domínio. A persistência do MVP é um dicionário em memória, sem banco externo. O `PriorityAdvisor` é um container lógico preparado, ainda desconectado das rotas.
 
 ```mermaid
-C4Container
-    title Containers — Micro-API de Contas a Pagar
+flowchart TB
+    financeiro["Equipe de financas"]
 
-    Person(financeiro, "Equipe de finanças", "Operação interna de contas a pagar.")
+    subgraph sistema["Micro-API de Contas a Pagar"]
+        web["API HTTP<br/>Uvicorn + FastAPI"]
+        app["Aplicacao de dominio<br/>AccountsPayableService + Pydantic"]
+        advisor["PriorityAdvisor<br/>heuristica local + LLM opcional"]
+        store[("Repositorio em memoria")]
+    end
 
-    System_Boundary(sistema, "Micro-API de Contas a Pagar") {
-        Container(web, "API HTTP", "Uvicorn + FastAPI", "Expõe /accounts-payable, health check, OpenAPI e handlers globais de erro.")
-        Container(app, "Aplicação de domínio", "AccountsPayableService + schemas Pydantic", "Valida entrada, aplica regras de estado e orquestra persistência.")
-        Container(advisor, "PriorityAdvisor", "Heurística local + LLM opcional", "Componente preparado e testado; ainda não integrado às rotas.")
-        ContainerDb(store, "Repositório em memória", "dict[UUID, AccountsPayableOut]", "Persistência volátil do MVP. Reinício da API apaga os registros.")
-    }
+    openai["API OpenAI<br/>externo opcional"]
 
-    System_Ext(openai, "API OpenAI", "Prioridade remota com timeout curto e fallback local.")
-
-    Rel(financeiro, web, "CRUD operacional e liquidação", "HTTP/JSON")
-    Rel(web, app, "Delega casos de uso", "chamada síncrona")
-    Rel(app, store, "Cria, lê, atualiza e liquida", "acesso em processo")
-    Rel_D(app, advisor, "Integração planejada", "ainda não conectada")
-    Rel_D(advisor, openai, "Sugestão remota opcional", "HTTPS")
+    financeiro -->|"HTTP/JSON"| web
+    web -->|"chamada sincrona"| app
+    app -->|"acesso em processo"| store
+    app -.->|"ainda nao conectada"| advisor
+    advisor -.->|"HTTPS opcional"| openai
 ```
 
 ### Diagrama estrutural — componentes internos
@@ -330,7 +324,7 @@ flowchart LR
     Routes --> Schemas
     Schemas --> Service
     Service --> Repository
-    Service -. ainda não integrado .-> Advisor
+    Service -. ainda nao integrado .-> Advisor
     Repository --> Service
     Service --> Routes
     Routes --> Client
@@ -348,37 +342,37 @@ Desvios: `422` na validação do contrato; `404` se o identificador não existir
 sequenceDiagram
     autonumber
     actor Cliente as Cliente HTTP
-    participant API as FastAPI / rotas
-    participant Schema as Pydantic<br/>AccountsPayablePaymentCreate
-    participant Svc as AccountsPayableService
-    participant Repo as AccountsPayableRepository
+    participant API as FastAPI
+    participant Schema as Pydantic
+    participant Svc as Service
+    participant Repo as Repository
 
-    Cliente->>API: POST /accounts-payable/{id}/payment<br/>data_pagamento, valor_pago, observacao_pagamento
+    Cliente->>API: POST /accounts-payable/id/payment
     API->>Schema: valida contrato JSON
 
-    alt data_pagamento no futuro ou valor_pago <= 0
+    alt payload invalido
         Schema-->>API: RequestValidationError
         API-->>Cliente: 422 erro_validacao
-    else payload válido
-        API->>Svc: register_payment(id, payload)
-        Svc->>Repo: get_by_id(id)
+    else payload valido
+        API->>Svc: register_payment
+        Svc->>Repo: get_by_id
 
         alt conta inexistente
             Repo-->>Svc: None
-            Svc-->>API: AccountsPayableNotFoundError
+            Svc-->>API: NotFoundError
             API-->>Cliente: 404 conta_nao_encontrada
         else conta encontrada
             Repo-->>Svc: AccountsPayableOut
-            Svc->>Svc: sincroniza overdue e aplica _ensure_payable
+            Svc->>Svc: sync overdue e ensure_payable
 
-            alt cancelada, já paga, valor diferente ou data anterior à emissão
-                Svc-->>API: AccountsPayableInvalidStateError
+            alt estado ou valor invalido
+                Svc-->>API: InvalidStateError
                 API-->>Cliente: 409 estado_invalido
-            else liquidação permitida
-                Svc->>Repo: register_payment(id, payload)
-                Repo-->>Svc: conta com status paid
+            else liquidacao permitida
+                Svc->>Repo: register_payment
+                Repo-->>Svc: status paid
                 Svc-->>API: AccountsPayableOut
-                API-->>Cliente: 200 Pagamento registrado com sucesso.
+                API-->>Cliente: 200 sucesso
             end
         end
     end
@@ -390,46 +384,46 @@ Descrição: o diagrama de atividades mostra o fluxo de trabalho da conta a paga
 
 ```mermaid
 flowchart TD
-    startNode([Início]) --> cadastrar["Cadastrar conta<br/>POST /accounts-payable"]
-    cadastrar --> validaCadastro{"Contrato válido?<br/>campos obrigatórios, valor &gt; 0,<br/>emissão ≤ vencimento"}
+    startNode([Inicio]) --> cadastrar[Cadastrar conta]
+    cadastrar --> validaCadastro{Contrato valido?}
 
-    validaCadastro -->|não| erro422["Retornar 422 erro_validacao"]
+    validaCadastro -->|nao| erro422[Retornar 422]
     erro422 --> fimErro([Fim])
 
-    validaCadastro -->|sim| persistir["Persistir conta com status pending"]
-    persistir --> consultar{"Consultar ou listar?"}
+    validaCadastro -->|sim| persistir[Persistir status pending]
+    persistir --> consultar{Consultar ou listar?}
 
-    consultar -->|sim| syncVencida{"data_vencimento &lt; hoje<br/>e status não terminal?"}
-    consultar -->|não| decidirAcao
-    syncVencida -->|sim| marcarOverdue["Sincronizar status overdue"]
-    syncVencida -->|não| decidirAcao
-    marcarOverdue --> decidirAcao{"Próxima ação operacional"}
+    consultar -->|sim| syncVencida{Vencida e nao terminal?}
+    consultar -->|nao| decidirAcao
+    syncVencida -->|sim| marcarOverdue[Sincronizar status overdue]
+    syncVencida -->|nao| decidirAcao
+    marcarOverdue --> decidirAcao{Proxima acao}
 
-    decidirAcao -->|atualizar dados| podeAtualizar{"Status pago ou cancelado?"}
-    podeAtualizar -->|sim| erro409upd["Retornar 409 estado_invalido"]
-    podeAtualizar -->|não| atualizar["Atualizar campos permitidos"]
+    decidirAcao -->|atualizar| podeAtualizar{Paga ou cancelada?}
+    podeAtualizar -->|sim| erro409upd[Retornar 409]
+    podeAtualizar -->|nao| atualizar[Atualizar campos permitidos]
     atualizar --> decidirAcao
     erro409upd --> fimErro
 
-    decidirAcao -->|cancelar| podeCancelar{"Status já pago ou cancelado?"}
-    podeCancelar -->|sim| erro409can["Retornar 409 estado_invalido"]
-    podeCancelar -->|não| cancelar["Transicionar para cancelled"]
-    cancelar --> fimCancelada([Fim — conta cancelada])
+    decidirAcao -->|cancelar| podeCancelar{Ja paga ou cancelada?}
+    podeCancelar -->|sim| erro409can[Retornar 409]
+    podeCancelar -->|nao| cancelar[Status cancelled]
+    cancelar --> fimCancelada([Fim conta cancelada])
     erro409can --> fimErro
 
-    decidirAcao -->|registrar pagamento| validaPagto{"Payload válido?<br/>valor_pago &gt; 0 e<br/>data_pagamento não futura"}
-    validaPagto -->|não| erro422pag["Retornar 422 erro_validacao"]
+    decidirAcao -->|pagar| validaPagto{Payload de pagamento valido?}
+    validaPagto -->|nao| erro422pag[Retornar 422]
     erro422pag --> fimErro
-    validaPagto -->|sim| existeConta{"Conta encontrada?"}
-    existeConta -->|não| erro404["Retornar 404 conta_nao_encontrada"]
+    validaPagto -->|sim| existeConta{Conta encontrada?}
+    existeConta -->|nao| erro404[Retornar 404]
     erro404 --> fimErro
-    existeConta -->|sim| podePagar{"Pagável?<br/>não paga, não cancelada,<br/>valor_pago = valor_previsto,<br/>data ≥ emissão"}
-    podePagar -->|não| erro409pag["Retornar 409 estado_invalido"]
+    existeConta -->|sim| podePagar{Pode liquidar?}
+    podePagar -->|nao| erro409pag[Retornar 409]
     erro409pag --> fimErro
-    podePagar -->|sim| liquidar["Persistir pagamento<br/>e status paid"]
-    liquidar --> fimPaga([Fim — conta liquidada])
+    podePagar -->|sim| liquidar[Persistir status paid]
+    liquidar --> fimPaga([Fim conta liquidada])
 
-    decidirAcao -->|encerrar consulta| fimConsulta([Fim — conta consultada])
+    decidirAcao -->|encerrar| fimConsulta([Fim conta consultada])
 ```
 
 ## Uso de IA
