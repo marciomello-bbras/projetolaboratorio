@@ -1,0 +1,16 @@
+flowchart LR
+    Client[Cliente API]
+    Routes[FastAPI Routes]
+    Schemas[Schemas Pydantic]
+    Service[AccountsPayableService]
+    Advisor[PriorityAdvisor]
+    Repository[AccountsPayableRepository]
+
+    Client --> Routes
+    Routes --> Schemas
+    Schemas --> Service
+    Service --> Repository
+    Service -.->|ainda nao integrado| Advisor
+    Repository --> Service
+    Service --> Routes
+    Routes --> Client

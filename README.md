@@ -49,6 +49,12 @@ docs/
   escopo-mvp.md
   backlog.md
   diagrama-componentes.md
+  diagrams/
+    contexto.mmd
+    containers.mmd
+    componentes.mmd
+    sequencia-pagamento.mmd
+    atividades.mmd
   adr/
     README.md
     0001-micro-api-rest-fastapi.md
@@ -265,68 +271,31 @@ Arquivos principais:
 - `app/repositories/accounts_payable_repository.py`: armazenamento em memória
 - `app/services/priority_advisor.py`: heurística local e chamada opcional de IA
 
-Os diagramas abaixo estão em Mermaid (`flowchart` e `sequenceDiagram`). A visão estrutural é inspirada no C4, com sintaxe que o GitHub consegue desenhar: sem `C4Context`/`C4Container`, sem HTML nos nós e sem o formato de cilindro `[( )]`. A cópia de apoio fica em `docs/diagrama-componentes.md`. As decisões que sustentam esse desenho estão em `docs/adr/`.
+Os diagramas abaixo são figuras PNG geradas a partir de Mermaid. O GitHub desta conta não renderiza blocos mermaid ao vivo (aparece "Unable to render rich display"), então o README mostra a imagem já desenhada. A fonte Mermaid está em `docs/diagrams/*.mmd`. As decisões que sustentam o desenho estão em `docs/adr/`.
 
 ### Diagrama estrutural — contexto do sistema (C4 Nível 1)
 
 Descrição: a equipe de finanças (ou um sistema interno) consome a micro-API por HTTP/JSON para operar o ciclo mínimo de contas a pagar. O `PriorityAdvisor` existe no repositório, mas ainda não participa das rotas. Quando `OPENAI_API_KEY` estiver configurada, ele pode consultar a API da OpenAI, com fallback local.
 
-```mermaid
-flowchart TB
-    financeiro[Equipe de financas]
-    cliente[Cliente HTTP Postman Swagger]
-    api[Micro-API de Contas a Pagar]
-    openai[API OpenAI opcional]
+![Contexto do sistema C4 nivel 1](docs/diagrams/contexto.png)
 
-    financeiro -->|HTTP JSON| api
-    cliente -->|OpenAPI REST| api
-    api -.->|HTTPS se OPENAI_API_KEY| openai
-```
+Fonte Mermaid: `docs/diagrams/contexto.mmd`
 
 ### Diagrama estrutural — visão de containers (C4 Nível 2)
 
 Descrição: um único processo Python (Uvicorn + FastAPI) concentra a API. A camada de aplicação aplica as regras de domínio. A persistência do MVP é um dicionário em memória, sem banco externo. O `PriorityAdvisor` é um container lógico preparado, ainda desconectado das rotas.
 
-```mermaid
-flowchart TB
-    financeiro[Equipe de financas]
-    subgraph sistema [Micro-API de Contas a Pagar]
-        web[API HTTP FastAPI]
-        app[Aplicacao de dominio]
-        advisor[PriorityAdvisor]
-        store[Repositorio em memoria]
-    end
-    openai[API OpenAI opcional]
+![Visao de containers C4 nivel 2](docs/diagrams/containers.png)
 
-    financeiro -->|HTTP JSON| web
-    web -->|chamada sincrona| app
-    app -->|acesso em processo| store
-    app -.->|ainda nao conectada| advisor
-    advisor -.->|HTTPS opcional| openai
-```
+Fonte Mermaid: `docs/diagrams/containers.mmd`
 
 ### Diagrama estrutural — componentes internos
 
 Descrição: detalha o caminho real da requisição dentro do processo. A rota valida o contrato com Pydantic, o serviço aplica regras e o repositório grava em memória. O advisor permanece fora do caminho feliz atual.
 
-```mermaid
-flowchart LR
-    Client["Cliente API"]
-    Routes["FastAPI Routes"]
-    Schemas["Schemas Pydantic"]
-    Service["AccountsPayableService"]
-    Advisor["PriorityAdvisor"]
-    Repository["AccountsPayableRepository"]
+![Componentes internos](docs/diagrams/componentes.png)
 
-    Client --> Routes
-    Routes --> Schemas
-    Schemas --> Service
-    Service --> Repository
-    Service -. ainda nao integrado .-> Advisor
-    Repository --> Service
-    Service --> Routes
-    Routes --> Client
-```
+Fonte Mermaid: `docs/diagrams/componentes.mmd`
 
 ### Diagrama comportamental — jornada crítica de liquidação
 
@@ -336,93 +305,17 @@ Caminho feliz: payload válido → conta encontrada → regras de liquidação o
 
 Desvios: `422` na validação do contrato; `404` se o identificador não existir; `409` se o estado ou o valor impedirem a liquidação.
 
-```mermaid
-sequenceDiagram
-    autonumber
-    actor Cliente as Cliente HTTP
-    participant API as FastAPI
-    participant Schema as Pydantic
-    participant Svc as Service
-    participant Repo as Repository
+![Sequencia da jornada de liquidacao](docs/diagrams/sequencia-pagamento.png)
 
-    Cliente->>API: POST /accounts-payable/id/payment
-    API->>Schema: valida contrato JSON
-
-    alt payload invalido
-        Schema-->>API: RequestValidationError
-        API-->>Cliente: 422 erro_validacao
-    else payload valido
-        API->>Svc: register_payment
-        Svc->>Repo: get_by_id
-
-        alt conta inexistente
-            Repo-->>Svc: None
-            Svc-->>API: NotFoundError
-            API-->>Cliente: 404 conta_nao_encontrada
-        else conta encontrada
-            Repo-->>Svc: AccountsPayableOut
-            Svc->>Svc: sync overdue e ensure_payable
-
-            alt estado ou valor invalido
-                Svc-->>API: InvalidStateError
-                API-->>Cliente: 409 estado_invalido
-            else liquidacao permitida
-                Svc->>Repo: register_payment
-                Repo-->>Svc: status paid
-                Svc-->>API: AccountsPayableOut
-                API-->>Cliente: 200 sucesso
-            end
-        end
-    end
-```
+Fonte Mermaid: `docs/diagrams/sequencia-pagamento.mmd`
 
 ### Diagrama comportamental — atividades do ciclo operacional
 
 Descrição: o diagrama de atividades mostra o fluxo de trabalho da conta a pagar, do cadastro até um estado terminal (`paid` ou `cancelled`). Consultas sincronizam vencidas automaticamente. Atualização e pagamento só seguem se a conta não estiver paga nem cancelada. A remoção física não aparece como caminho válido: a API bloqueia `DELETE` e exige cancelamento para preservar rastreabilidade.
 
-```mermaid
-flowchart TD
-    startNode([Inicio]) --> cadastrar[Cadastrar conta]
-    cadastrar --> validaCadastro{Contrato valido?}
+![Atividades do ciclo operacional](docs/diagrams/atividades.png)
 
-    validaCadastro -->|nao| erro422[Retornar 422]
-    erro422 --> fimErro([Fim])
-
-    validaCadastro -->|sim| persistir[Persistir status pending]
-    persistir --> consultar{Consultar ou listar?}
-
-    consultar -->|sim| syncVencida{Vencida e nao terminal?}
-    consultar -->|nao| decidirAcao
-    syncVencida -->|sim| marcarOverdue[Sincronizar status overdue]
-    syncVencida -->|nao| decidirAcao
-    marcarOverdue --> decidirAcao{Proxima acao}
-
-    decidirAcao -->|atualizar| podeAtualizar{Paga ou cancelada?}
-    podeAtualizar -->|sim| erro409upd[Retornar 409]
-    podeAtualizar -->|nao| atualizar[Atualizar campos permitidos]
-    atualizar --> decidirAcao
-    erro409upd --> fimErro
-
-    decidirAcao -->|cancelar| podeCancelar{Ja paga ou cancelada?}
-    podeCancelar -->|sim| erro409can[Retornar 409]
-    podeCancelar -->|nao| cancelar[Status cancelled]
-    cancelar --> fimCancelada([Fim conta cancelada])
-    erro409can --> fimErro
-
-    decidirAcao -->|pagar| validaPagto{Payload de pagamento valido?}
-    validaPagto -->|nao| erro422pag[Retornar 422]
-    erro422pag --> fimErro
-    validaPagto -->|sim| existeConta{Conta encontrada?}
-    existeConta -->|nao| erro404[Retornar 404]
-    erro404 --> fimErro
-    existeConta -->|sim| podePagar{Pode liquidar?}
-    podePagar -->|nao| erro409pag[Retornar 409]
-    erro409pag --> fimErro
-    podePagar -->|sim| liquidar[Persistir status paid]
-    liquidar --> fimPaga([Fim conta liquidada])
-
-    decidirAcao -->|encerrar| fimConsulta([Fim conta consultada])
-```
+Fonte Mermaid: `docs/diagrams/atividades.mmd`
 
 ## Uso de IA
 

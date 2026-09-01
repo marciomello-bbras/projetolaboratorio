@@ -1,0 +1,15 @@
+flowchart TB
+    financeiro[Equipe de financas]
+    subgraph sistema [Micro-API de Contas a Pagar]
+        web[API HTTP FastAPI]
+        app[Aplicacao de dominio]
+        advisor[PriorityAdvisor]
+        store[Repositorio em memoria]
+    end
+    openai[API OpenAI opcional]
+
+    financeiro -->|HTTP JSON| web
+    web -->|chamada sincrona| app
+    app -->|acesso em processo| store
+    app -.->|ainda nao conectada| advisor
+    advisor -.->|HTTPS opcional| openai

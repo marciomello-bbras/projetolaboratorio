@@ -1,0 +1,37 @@
+sequenceDiagram
+    autonumber
+    actor Cliente as Cliente HTTP
+    participant API as FastAPI
+    participant Schema as Pydantic
+    participant Svc as Service
+    participant Repo as Repository
+
+    Cliente->>API: POST /accounts-payable/id/payment
+    API->>Schema: valida contrato JSON
+
+    alt payload invalido
+        Schema-->>API: RequestValidationError
+        API-->>Cliente: 422 erro_validacao
+    else payload valido
+        API->>Svc: register_payment
+        Svc->>Repo: get_by_id
+
+        alt conta inexistente
+            Repo-->>Svc: None
+            Svc-->>API: NotFoundError
+            API-->>Cliente: 404 conta_nao_encontrada
+        else conta encontrada
+            Repo-->>Svc: AccountsPayableOut
+            Svc->>Svc: sync overdue e ensure_payable
+
+            alt estado ou valor invalido
+                Svc-->>API: InvalidStateError
+                API-->>Cliente: 409 estado_invalido
+            else liquidacao permitida
+                Svc->>Repo: register_payment
+                Repo-->>Svc: status paid
+                Svc-->>API: AccountsPayableOut
+                API-->>Cliente: 200 sucesso
+            end
+        end
+    end

@@ -1,0 +1,41 @@
+flowchart TD
+    startNode([Inicio]) --> cadastrar[Cadastrar conta]
+    cadastrar --> validaCadastro{Contrato valido?}
+
+    validaCadastro -->|nao| erro422[Retornar 422]
+    erro422 --> fimErro([Fim])
+
+    validaCadastro -->|sim| persistir[Persistir status pending]
+    persistir --> consultar{Consultar ou listar?}
+
+    consultar -->|sim| syncVencida{Vencida e nao terminal?}
+    consultar -->|nao| decidirAcao
+    syncVencida -->|sim| marcarOverdue[Sincronizar status overdue]
+    syncVencida -->|nao| decidirAcao
+    marcarOverdue --> decidirAcao{Proxima acao}
+
+    decidirAcao -->|atualizar| podeAtualizar{Paga ou cancelada?}
+    podeAtualizar -->|sim| erro409upd[Retornar 409]
+    podeAtualizar -->|nao| atualizar[Atualizar campos permitidos]
+    atualizar --> decidirAcao
+    erro409upd --> fimErro
+
+    decidirAcao -->|cancelar| podeCancelar{Ja paga ou cancelada?}
+    podeCancelar -->|sim| erro409can[Retornar 409]
+    podeCancelar -->|nao| cancelar[Status cancelled]
+    cancelar --> fimCancelada([Fim conta cancelada])
+    erro409can --> fimErro
+
+    decidirAcao -->|pagar| validaPagto{Payload de pagamento valido?}
+    validaPagto -->|nao| erro422pag[Retornar 422]
+    erro422pag --> fimErro
+    validaPagto -->|sim| existeConta{Conta encontrada?}
+    existeConta -->|nao| erro404[Retornar 404]
+    erro404 --> fimErro
+    existeConta -->|sim| podePagar{Pode liquidar?}
+    podePagar -->|nao| erro409pag[Retornar 409]
+    erro409pag --> fimErro
+    podePagar -->|sim| liquidar[Persistir status paid]
+    liquidar --> fimPaga([Fim conta liquidada])
+
+    decidirAcao -->|encerrar| fimConsulta([Fim conta consultada])

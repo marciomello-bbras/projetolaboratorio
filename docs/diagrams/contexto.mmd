@@ -1,0 +1,9 @@
+flowchart TB
+    financeiro[Equipe de financas]
+    cliente[Cliente HTTP Postman Swagger]
+    api[Micro-API de Contas a Pagar]
+    openai[API OpenAI opcional]
+
+    financeiro -->|HTTP JSON| api
+    cliente -->|OpenAPI REST| api
+    api -.->|HTTPS se OPENAI_API_KEY| openai
